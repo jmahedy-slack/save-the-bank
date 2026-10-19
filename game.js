@@ -623,10 +623,10 @@ const player = {
   onGround: false,
 };
 
-// Third-person camera offset: behind and slightly above
-const CAM_BACK  = 3.5;
-const CAM_UP    = 1.8;
-const CAM_LERP  = 0.12;
+// Third-person camera offset: behind and above — zoomed out for better world view
+const CAM_BACK  = 6.5;
+const CAM_UP    = 3.2;
+const CAM_LERP  = 0.10;
 const camPos = new THREE.Vector3();
 
 function updateCamera() {
@@ -668,8 +668,18 @@ renderer.domElement.addEventListener('click', () => {
     renderer.domElement.requestPointerLock();
   }
 });
+const $ctrlGuide  = document.getElementById('controls-guide');
+const $lockNotice = document.getElementById('lock-notice');
+
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = document.pointerLockElement === renderer.domElement;
+  if (pointerLocked) {
+    $lockNotice.style.display = 'none';
+    $ctrlGuide.style.display  = 'block';
+  } else {
+    $ctrlGuide.style.display  = 'none';
+    if (gameState === 'playing') $lockNotice.style.display = 'block';
+  }
 });
 document.addEventListener('mousemove', e => {
   if (!pointerLocked) return;
@@ -682,7 +692,7 @@ function movePlayer(dt) {
   // Mouse look
   const SENS = 0.002;
   player.yaw   -= mouseDX * SENS;
-  player.pitch  = Math.max(-0.4, Math.min(0.8, player.pitch - mouseDY * SENS));
+  player.pitch  = Math.max(-0.6, Math.min(1.1, player.pitch - mouseDY * SENS));
   mouseDX = 0; mouseDY = 0;
 
   const sprint = keys['Shift'];
@@ -704,8 +714,6 @@ function movePlayer(dt) {
   if (moving) {
     player.vx = nx * speed;
     player.vz = nz * speed;
-    // Face direction of travel
-    player.yaw = Math.atan2(nx, nz);
   } else {
     player.vx *= 0.8;
     player.vz *= 0.8;
@@ -734,9 +742,16 @@ function movePlayer(dt) {
     player.onGround = false;
   }
 
-  // Update player mesh
+  // Update player mesh — face movement direction when moving, else face camera yaw
   playerMesh.position.set(player.x, player.y, player.z);
-  playerMesh.rotation.y = player.yaw + Math.PI;
+  if (moving) {
+    const targetFace = Math.atan2(nx, nz) + Math.PI;
+    // Smooth rotation towards movement direction
+    let diff = targetFace - playerMesh.rotation.y;
+    while (diff > Math.PI)  diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    playerMesh.rotation.y += diff * 0.2;
+  }
 
   // Walk animation
   if (moving) {
@@ -928,10 +943,13 @@ function togglePause() {
   if (gameState === 'playing') {
     gameState = 'paused';
     document.getElementById('pause-overlay').style.display = 'flex';
+    $lockNotice.style.display = 'none';
+    $ctrlGuide.style.display  = 'none';
     if (document.pointerLockElement) document.exitPointerLock();
   } else if (gameState === 'paused') {
     gameState = 'playing';
     document.getElementById('pause-overlay').style.display = 'none';
+    $lockNotice.style.display = 'block';
   }
 }
 
@@ -969,8 +987,9 @@ function startGame() {
   ['title-overlay','end-overlay','pause-overlay'].forEach(id =>
     document.getElementById(id).style.display = 'none');
   gameState = 'playing';
+  $lockNotice.style.display = 'block';
+  $ctrlGuide.style.display  = 'none';
   updateHUD();
-  showToast('Click the scene to enable mouse look. WASD to move, E to interact.', '#36C5F0');
 }
 
 // ─── Portrait ─────────────────────────────────────────────────────────────────

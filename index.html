@@ -98,6 +98,34 @@
     z-index: 200; display: none; letter-spacing: 1px; pointer-events: none;
   }
 
+  /* ── Controls guide ── */
+  #controls-guide {
+    position: fixed; top: 72px; left: 14px;
+    background: rgba(9,8,23,0.85); border: 1px solid rgba(63,14,64,0.8);
+    border-radius: 6px; padding: 10px 13px; z-index: 20;
+    font-size: 11px; color: #888; line-height: 2;
+    pointer-events: none; display: none;
+    backdrop-filter: blur(4px);
+    min-width: 170px;
+  }
+  #controls-guide .cg-title {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 2px;
+    color: #555; margin-bottom: 4px;
+  }
+  .cg-row { display: flex; justify-content: space-between; gap: 16px; }
+  .cg-key {
+    display: inline-block; background: #2a1840; border: 1px solid #4a2860;
+    border-radius: 3px; padding: 1px 6px; font-family: 'Courier New', monospace;
+    color: #36C5F0; font-size: 10px; min-width: 22px; text-align: center;
+  }
+  .cg-act { color: #aaa; }
+  #lock-notice {
+    position: fixed; top: 72px; left: 14px; z-index: 20;
+    font-size: 11px; color: #ECB22E; letter-spacing: 1px;
+    background: rgba(9,8,23,0.85); border: 1px solid rgba(236,178,46,0.3);
+    border-radius: 5px; padding: 7px 13px; pointer-events: none; display: none;
+  }
+
   /* ── Interact prompt ── */
   #interact-prompt {
     position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
@@ -236,6 +264,20 @@
     <button class="btn btn-green" id="replay-btn">PLAY AGAIN</button>
   </div>
 </div>
+
+<!-- Controls guide (visible during play) -->
+<div id="controls-guide">
+  <div class="cg-title">Controls</div>
+  <div class="cg-row"><span><span class="cg-key">W</span><span class="cg-key">A</span><span class="cg-key">S</span><span class="cg-key">D</span></span><span class="cg-act">Move</span></div>
+  <div class="cg-row"><span><span class="cg-key">Mouse</span></span><span class="cg-act">Look / Pan</span></div>
+  <div class="cg-row"><span><span class="cg-key">Shift</span></span><span class="cg-act">Sprint</span></div>
+  <div class="cg-row"><span><span class="cg-key">Space</span></span><span class="cg-act">Jump</span></div>
+  <div class="cg-row"><span><span class="cg-key">E</span></span><span class="cg-act">Interact</span></div>
+  <div class="cg-row"><span><span class="cg-key">H</span></span><span class="cg-act">AI Hint</span></div>
+  <div class="cg-row"><span><span class="cg-key">Esc</span></span><span class="cg-act">Pause</span></div>
+</div>
+<!-- Click-to-lock notice (when pointer not locked) -->
+<div id="lock-notice">▶  Click to enable mouse look</div>
 
 <script type="importmap">
 {
