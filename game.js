@@ -139,15 +139,15 @@ function buildCentralAtrium() {
     }
   // Aubergine carpet in centre 7×7
   fillFloor(-7, 7, -7, 7, 1, 0x3F0E40);
-  // Brand-colour cross inlaid in marble (NatWest wayfinding)
-  for (let x = -23; x <= 23; x++) vox(x, 2, 0,  0x2a1040); // E-W centre line
-  for (let z = -19; z <= 19; z++) vox(0,  2, z,  0x2a1040); // N-S centre line
-  // Neon LED floor strips around carpet edge
+  // Brand-colour cross inlaid in marble at FLOOR level (y=1, not raised)
+  for (let x = -23; x <= 23; x++) setSolid(x, 1, 0,  0x2a1040);
+  for (let z = -19; z <= 19; z++) setSolid(0, 1, z,  0x2a1040);
+  // Neon LED floor strips at FLOOR level (y=1) so they don't block walking
   for (let i = -8; i <= 8; i++) {
-    vox(i,  2, -8, P.neonBlue, { emissive: P.neonBlue });
-    vox(i,  2,  8, P.neonBlue, { emissive: P.neonBlue });
-    vox(-8, 2, i,  P.neonBlue, { emissive: P.neonBlue });
-    vox( 8, 2, i,  P.neonBlue, { emissive: P.neonBlue });
+    setSolid(i,  1, -8, P.neonBlue, { emissive: P.neonBlue });
+    setSolid(i,  1,  8, P.neonBlue, { emissive: P.neonBlue });
+    setSolid(-8, 1, i,  P.neonBlue, { emissive: P.neonBlue });
+    setSolid( 8, 1, i,  P.neonBlue, { emissive: P.neonBlue });
   }
 
   // ── Outer walls — NatWest aubergine with panelling ──
@@ -196,21 +196,31 @@ function buildCentralAtrium() {
     vox( 22, CH, z, P.neonPurple, { emissive: P.neonPurple });
   }
 
-  // ── Columns — classic corporate pillars at intervals ──
+  // ── Columns — placed away from walkways ──
   const colPositions = [
     [-18,-14], [-18,14], [18,-14], [18,14],
     [-18,  0], [18,   0],
-    [  0,-14], [ 0,  14],
   ];
   colPositions.forEach(([cx,cz]) => buildColumn(cx, 2, cz, CH, P.neonBlue));
 
-  // ── Interior divider walls ──
+  // ── Interior divider walls — with doorway openings at z=0 ──
   fillBox(-24, 2, -8, -24, 7, 8, 0x3F0E40);
   fillBox( 24, 2, -8,  24, 7, 8, 0x3F0E40);
   fillBox(-8,  2, -20,  8, 7, -20, 0x3F0E40);
   fillBox(-8,  2,  20,  8, 7,  20, 0x3F0E40);
-  fillBox(-8,  2, -12, -8, 7, 12, P.wallTrim);
-  fillBox( 8,  2, -12,  8, 7, 12, P.wallTrim);
+  // Left inner wall: split into north/south segments leaving a 3-wide doorway at z=0
+  fillBox(-8, 2, -12, -8, 7, -3, P.wallTrim);  // north segment
+  fillBox(-8, 2,   3, -8, 7, 12, P.wallTrim);  // south segment
+  // Right inner wall: same
+  fillBox( 8, 2, -12,  8, 7, -3, P.wallTrim);
+  fillBox( 8, 2,   3,  8, 7, 12, P.wallTrim);
+  // Door frame highlights around openings
+  for (let y = 2; y <= 5; y++) {
+    vox(-8, y, -3, P.neonBlue, { emissive: P.neonBlue });
+    vox(-8, y,  3, P.neonBlue, { emissive: P.neonBlue });
+    vox( 8, y, -3, P.neonBlue, { emissive: P.neonBlue });
+    vox( 8, y,  3, P.neonBlue, { emissive: P.neonBlue });
+  }
 
   // ── NatWest cube logo on back wall ──
   buildNatwestLogo(0, 4, -19);
@@ -249,22 +259,21 @@ function buildCentralAtrium() {
   vox( 0, 5,-1, P.neonRed,    { emissive: P.neonRed    });
   vox( 0, 5, 1, P.neonRed,    { emissive: P.neonRed    });
 
-  // ── Seating area (to the left of reception) ──
-  for (const [sx,sz] of [[-15,-5],[-13,-5],[-15,-3],[-13,-3]]) {
-    vox(sx, 2, sz, P.carpet);
-    vox(sx, 3, sz, 0x1a1040); // seat
-    vox(sx, 4, sz, 0x1a1040); // back
+  // ── Seating area (against the left wall, not blocking walkways) ──
+  for (const [sx,sz] of [[-21,-5],[-21,-3],[-19,-5],[-19,-3]]) {
+    setSolid(sx, 1, sz, P.carpet);  // carpet pad at floor level
+    vox(sx, 2, sz, 0x1a1040); // seat
+    vox(sx, 3, sz, 0x1a1040); // back
   }
-  // Coffee table
-  vox(-14, 2, -4, P.deskTop);
-  vox(-14, 3, -4, 0x5a3a18);
+  // Coffee table (floor-level surface)
+  vox(-20, 2, -4, P.deskTop);
 
-  // ── Info kiosks by entrance ──
-  for (const [kx,kz] of [[15,-5],[15,5],[-15,5]]) {
+  // ── Info kiosks against right wall ──
+  for (const [kx,kz] of [[21,-5],[21,5],[21,0]]) {
     vox(kx, 2, kz, 0x1a1030);
     vox(kx, 3, kz, P.screenOn, { emissive: P.neonBlue });
     vox(kx, 4, kz, P.screenOn, { emissive: P.neonBlue });
-    vox(kx, 5, kz, P.neonCyan, { emissive: P.neonCyan }); // top light
+    vox(kx, 5, kz, P.neonCyan, { emissive: P.neonCyan });
   }
 }
 
