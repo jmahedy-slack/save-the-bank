@@ -7,7 +7,7 @@ import * as THREE from 'three';
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const P = {
   floorTile: 0xdde0e8, floorTile2: 0xc8ccd4, carpet: 0x2a1840, carpetLit: 0x3a2050,
-  wall: 0x3d2a55, wallTrim: 0x6a3a88, ceiling: 0x28184a,
+  wall: 0x3F0E40, wallTrim: 0x5a1a6a, ceiling: 0x1a0828,
   glass: 0x4a9fd4, glassLit: 0x6bc4f0,
   desk: 0x3d2812, deskTop: 0x5a3a18, chair: 0x1a1a2a,
   server: 0x0d2240, serverLit: 0x1a3a58, serverFront: 0x0a1828,
@@ -100,99 +100,344 @@ function plantTree(x, y, z) {
   fillBox(x-1, y+6, z-1, x+1, y+7, z+1, P.plant);
 }
 
-// Central atrium: 48×40 building footprint, open 10H atrium in middle 16×16
+// NatWest cube logo (diagonal diamond arrangement of brand-colour voxels)
+// Built on the back wall of the atrium (z=-19), centred at x=0, y=3..7
+function buildNatwestLogo(cx, y0, cz) {
+  // NatWest brand colours in their cube-logo arrangement
+  // Rows are laid out as a diamond (widest in middle)
+  const NW = P.natwestRed;   // NatWest red  #da2035
+  const AU = 0x3F0E40;       // Aubergine
+  const TB = 0x36C5F0;       // Teal blue
+  const GR = 0x2EB67D;       // Green
+  const rows = [
+    [AU, TB],
+    [NW, AU, TB, GR],
+    [NW, NW, AU, AU, TB, TB, GR, GR],
+    [NW, AU, TB, GR],
+    [AU, GR],
+  ];
+  rows.forEach((row, ri) => {
+    const w = row.length;
+    row.forEach((col, ci) => {
+      const x = cx - Math.floor(w / 2) + ci;
+      const y = y0 + ri;
+      vox(x, y, cz, col, { emissive: col });
+    });
+  });
+}
+
+// Central atrium — NatWest Technology Hub corporate lobby
 function buildCentralAtrium() {
-  const W=24, D=20, CH=8; // half-widths, ceiling height
-  // Outer floor
-  fillFloor(-W, W, -D, D, 1, P.floorTile2);
-  // Atrium inner area (special floor)
-  fillFloor(-8, 8, -8, 8, 1, P.carpet, { emissive: 0 });
-  // Illuminated strips
-  for (let i = -7; i <= 7; i += 2) {
-    vox(i, 2, 0, P.neonBlue, { emissive: P.neonBlue });
-    vox(0, 2, i, P.neonPurple, { emissive: P.neonPurple });
+  const W=24, D=20, CH=8;
+
+  // ── Floor — corporate white marble with brand-colour veining ──
+  for (let x = -W; x <= W; x++)
+    for (let z = -D; z <= D; z++) {
+      // Base marble: white with slight texture variation
+      const tone = ((x*3+z*7) & 7) < 2 ? 0xe0dce8 : 0xeceaf2;
+      setSolid(x, 1, z, tone);
+    }
+  // Aubergine carpet in centre 7×7
+  fillFloor(-7, 7, -7, 7, 1, 0x3F0E40);
+  // Brand-colour cross inlaid in marble (NatWest wayfinding)
+  for (let x = -23; x <= 23; x++) vox(x, 2, 0,  0x2a1040); // E-W centre line
+  for (let z = -19; z <= 19; z++) vox(0,  2, z,  0x2a1040); // N-S centre line
+  // Neon LED floor strips around carpet edge
+  for (let i = -8; i <= 8; i++) {
+    vox(i,  2, -8, P.neonBlue, { emissive: P.neonBlue });
+    vox(i,  2,  8, P.neonBlue, { emissive: P.neonBlue });
+    vox(-8, 2, i,  P.neonBlue, { emissive: P.neonBlue });
+    vox( 8, 2, i,  P.neonBlue, { emissive: P.neonBlue });
   }
-  // Outer walls
-  fillBox(-W, 2, -D, -W, CH, -D+1, P.wall);
-  fillBox( W, 2, -D,  W, CH, D, P.wall);
-  fillBox(-W, 2, -D,  W, CH, -D, P.wall);
-  fillBox(-W, 2,  D,  W, CH,  D, P.wall);
-  // Glass panels on outer walls
-  for (let x = -20; x <= 20; x += 5) {
-    fillBox(x, 3, -D, x+3, 7, -D, P.glassLit, { emissive: 0 });
-    fillBox(x, 3, D,  x+3, 7,  D, P.glassLit, { emissive: 0 });
+
+  // ── Outer walls — NatWest aubergine with panelling ──
+  fillBox(-W, 2, -D, -W, CH, D,   0x3F0E40);
+  fillBox( W, 2, -D,  W, CH, D,   0x3F0E40);
+  fillBox(-W, 2, -D,  W, CH, -D,  0x3F0E40);
+  fillBox(-W, 2,  D,  W, CH,  D,  0x3F0E40);
+  // Skirting board (darker strip at base of walls)
+  fillBox(-W, 2, -D,  W, 2, -D, 0x2a0830);
+  fillBox(-W, 2,  D,  W, 2,  D, 0x2a0830);
+  fillBox(-W, 2, -D, -W, 2,  D, 0x2a0830);
+  fillBox( W, 2, -D,  W, 2,  D, 0x2a0830);
+  // Cornice strip at top (lighter fascia)
+  fillBox(-W, 8, -D,  W, 8, -D, P.wallTrim);
+  fillBox(-W, 8,  D,  W, 8,  D, P.wallTrim);
+  fillBox(-W, 8, -D, -W, 8,  D, P.wallTrim);
+  fillBox( W, 8, -D,  W, 8,  D, P.wallTrim);
+
+  // ── Glass windows on facade walls ──
+  for (let x = -22; x <= 20; x += 5) {
+    fillBox(x, 3, -D, x+3, 7, -D, 0x4ab0d8);
+    fillBox(x, 3,  D, x+3, 7,  D, 0x4ab0d8);
   }
-  // Ceiling
-  fillFloor(-W, W, -D, D, CH+1, P.ceiling);
-  // Interior wall dividers (partitions between zones)
-  fillBox(-24, 2, -8, -24, 7, 8, P.wall);
-  fillBox( 24, 2, -8,  24, 7, 8, P.wall);
-  fillBox(-8, 2, -20, 8, 7, -20, P.wall);
-  fillBox(-8, 2,  20, 8, 7,  20, P.wall);
-  // Interior corridor walls
-  fillBox(-8, 2, -12, -8, 7, 12, P.wallTrim);
-  fillBox( 8, 2, -12,  8, 7, 12, P.wallTrim);
-  fillBox(-12, 2, -8, 12, 2, -8, P.wallTrim);
-  fillBox(-12, 2,  8, 12, 2,  8, P.wallTrim);
-  // NatWest signage on wall — big glowing sign
-  fillBox(-6, 6, -19, 6, 8, -19, P.wall);
-  fillBox(-5, 7, -19, 5, 8, -19, P.natwestRed, { emissive: P.natwestRed });
-  fillBox(-3, 6, -19, 3, 6, -19, 0xff6688, { emissive: 0xff6688 });
-  // Central holographic cube installation (bright cyan like the ref)
-  fillBox(-2, 2, -2, 2, 5, 2, P.neonBlue, { emissive: P.neonBlue });
-  fillBox(-1, 6, -1, 1, 6, 1, P.neonCyan, { emissive: P.neonCyan });
-  vox(0, 7, 0, 0xffffff, { emissive: 0xffffff });
-  // Alert beacon at centre
-  vox(0, 8, 0, P.neonRed, { emissive: P.neonRed });
-  // Atrium floor neon grid
-  for (let i = -7; i <= 7; i++) {
-    vox(i, 2, -7, P.neonPurple, { emissive: P.neonPurple });
-    vox(i, 2,  7, P.neonPurple, { emissive: P.neonPurple });
-    vox(-7, 2, i, P.neonBlue,   { emissive: P.neonBlue });
-    vox( 7, 2, i, P.neonBlue,   { emissive: P.neonBlue });
+  // Window frames (slightly lighter than wall)
+  for (let x = -22; x <= 20; x += 5) {
+    vox(x-1, 3, -D, P.wallTrim); vox(x+4, 3, -D, P.wallTrim);
+    vox(x-1, 7, -D, P.wallTrim); vox(x+4, 7, -D, P.wallTrim);
+    vox(x-1, 3,  D, P.wallTrim); vox(x+4, 3,  D, P.wallTrim);
+    vox(x-1, 7,  D, P.wallTrim); vox(x+4, 7,  D, P.wallTrim);
+  }
+
+  // ── Ceiling — coffered panels with LED strips ──
+  for (let x = -W; x <= W; x++)
+    for (let z = -D; z <= D; z++)
+      setSolid(x, CH+1, z, ((x+z)%4===0) ? 0x1e0e30 : 0x1a0828);
+  // LED strips: main grid
+  for (let x = -20; x <= 20; x += 4) vox(x, CH, 0,  P.neonBlue, { emissive: P.neonBlue });
+  for (let z = -16; z <= 16; z += 4) vox(0,  CH, z, P.neonBlue, { emissive: P.neonBlue });
+  // Perimeter LED strip
+  for (let x = -22; x <= 22; x++) {
+    vox(x, CH, -18, P.neonPurple, { emissive: P.neonPurple });
+    vox(x, CH,  18, P.neonPurple, { emissive: P.neonPurple });
+  }
+  for (let z = -18; z <= 18; z++) {
+    vox(-22, CH, z, P.neonPurple, { emissive: P.neonPurple });
+    vox( 22, CH, z, P.neonPurple, { emissive: P.neonPurple });
+  }
+
+  // ── Columns — classic corporate pillars at intervals ──
+  const colPositions = [
+    [-18,-14], [-18,14], [18,-14], [18,14],
+    [-18,  0], [18,   0],
+    [  0,-14], [ 0,  14],
+  ];
+  colPositions.forEach(([cx,cz]) => buildColumn(cx, 2, cz, CH, P.neonBlue));
+
+  // ── Interior divider walls ──
+  fillBox(-24, 2, -8, -24, 7, 8, 0x3F0E40);
+  fillBox( 24, 2, -8,  24, 7, 8, 0x3F0E40);
+  fillBox(-8,  2, -20,  8, 7, -20, 0x3F0E40);
+  fillBox(-8,  2,  20,  8, 7,  20, 0x3F0E40);
+  fillBox(-8,  2, -12, -8, 7, 12, P.wallTrim);
+  fillBox( 8,  2, -12,  8, 7, 12, P.wallTrim);
+
+  // ── NatWest cube logo on back wall ──
+  buildNatwestLogo(0, 4, -19);
+  // Electric blue brand strip above logo
+  fillBox(-8, 8, -19, 8, 8, -19, P.neonBlue, { emissive: P.neonBlue });
+
+  // ── Reception desk — L-shaped with screens ──
+  // Main desk face
+  fillBox(-5, 2, -13, 5, 2, -13, P.deskTop);
+  fillBox(-5, 2, -13, 5, 3, -13, 0x3d2812);
+  // Side wing
+  fillBox( 5, 2, -15,  5, 3, -13, 0x3d2812);
+  fillBox(-5, 2, -15, -5, 3, -13, 0x3d2812);
+  // Monitors (5 across)
+  for (let mx = -3; mx <= 3; mx += 2) {
+    vox(mx,   3, -13, P.screenOn, { emissive: mx === 1 ? P.neonRed : P.neonBlue });
+    vox(mx,   4, -13, P.screenOn, { emissive: mx === 1 ? P.neonRed : P.neonBlue });
+  }
+  // Desk lamp
+  vox(-4, 4, -13, P.neonAmber, { emissive: P.neonAmber });
+  vox( 4, 4, -13, P.neonAmber, { emissive: P.neonAmber });
+
+  // ── Floor directional arrow strips ──
+  for (let i = -5; i < 0; i++) vox(i, 2,  5, P.neonRed,   { emissive: P.neonRed   });
+  for (let i = 0; i <= 5; i++) vox(i, 2,  5, P.neonAmber, { emissive: P.neonAmber });
+  for (let i = -5; i < 0; i++) vox(i, 2, -5, P.neonGreen, { emissive: P.neonGreen });
+  for (let i = 0; i <= 5; i++) vox(i, 2, -5, P.neonCyan,  { emissive: P.neonCyan  });
+
+  // ── Central SEV-1 emergency beacon pillar ──
+  fillBox(-1, 2, -1, 1, 4, 1, 0x3a0a40);
+  fillBox(-1, 4, -1, 1, 4, 1, 0x2a0028);
+  vox( 0, 5, 0, P.natwestRed, { emissive: P.natwestRed });
+  vox( 0, 6, 0, P.neonRed,    { emissive: P.neonRed    });
+  vox(-1, 5, 0, P.neonRed,    { emissive: P.neonRed    });
+  vox( 1, 5, 0, P.neonRed,    { emissive: P.neonRed    });
+  vox( 0, 5,-1, P.neonRed,    { emissive: P.neonRed    });
+  vox( 0, 5, 1, P.neonRed,    { emissive: P.neonRed    });
+
+  // ── Seating area (to the left of reception) ──
+  for (const [sx,sz] of [[-15,-5],[-13,-5],[-15,-3],[-13,-3]]) {
+    vox(sx, 2, sz, P.carpet);
+    vox(sx, 3, sz, 0x1a1040); // seat
+    vox(sx, 4, sz, 0x1a1040); // back
+  }
+  // Coffee table
+  vox(-14, 2, -4, P.deskTop);
+  vox(-14, 3, -4, 0x5a3a18);
+
+  // ── Info kiosks by entrance ──
+  for (const [kx,kz] of [[15,-5],[15,5],[-15,5]]) {
+    vox(kx, 2, kz, 0x1a1030);
+    vox(kx, 3, kz, P.screenOn, { emissive: P.neonBlue });
+    vox(kx, 4, kz, P.screenOn, { emissive: P.neonBlue });
+    vox(kx, 5, kz, P.neonCyan, { emissive: P.neonCyan }); // top light
   }
 }
 
-// Data Centre: x=-24..-16, z=-20..-12
+// NatWest Data Centre — hot/cold aisle, detailed racks, CRAC units, cable trays
+// Room: x=-24..-14  z=-20..-10
 function buildDataCentre() {
-  fillFloor(-24, -14, -20, -10, 1, P.floorTile);
-  fillBox(-24, 2, -20, -14, 8, -20, P.wall);
-  fillBox(-24, 2, -10, -14, 8, -10, P.wallTrim);
-  fillBox(-24, 2, -20, -24, 8, -10, P.wall);
-  fillBox(-14, 2, -20, -14, 8, -10, P.wallTrim);
-  fillFloor(-24, -14, -20, -10, 9, P.ceiling);
-  // Server racks (2 wide, 5 high, standing against back wall)
-  for (let i = 0; i < 4; i++) {
-    const x = -23 + i * 2;
-    fillBox(x, 2, -19, x+1, 6, -19, P.server);
-    fillBox(x, 2, -19, x+1, 6, -19, P.serverFront);
-    // LEDs
-    for (let u = 0; u < 6; u++) {
-      const lc = u < 4 ? P.ledGreen : P.ledRed;
-      vox(x, 2+u, -18, lc, { emissive: lc });
+  // ── Raised floor — 2-tone checkerboard tiles
+  for (let x = -24; x <= -14; x++)
+    for (let z = -20; z <= -10; z++)
+      setSolid(x, 1, z, ((x+z) % 2 === 0) ? 0xbdc1ca : 0xd4d8e0);
+
+  // ── Walls — dark charcoal panels
+  const DCWALL = 0x09101a;
+  // Back wall with depth: two layers for visual thickness
+  fillBox(-24, 2, -20, -14, 8, -20, DCWALL);
+  fillBox(-24, 2, -20, -24, 8, -10, DCWALL); // left
+  fillBox(-14, 2, -20, -14, 8, -10, DCWALL); // right
+  fillBox(-24, 2, -10, -14, 8, -10, 0x121e2c); // front (slightly lighter)
+
+  // Ceiling — varied panels
+  for (let x = -24; x <= -14; x++)
+    for (let z = -20; z <= -10; z++)
+      setSolid(x, 9, z, ((x+z)%3===0) ? 0x0a0f18 : 0x080c14);
+
+  // ── Wall detail: horizontal cable conduit runs ──
+  // Left wall: data (cyan), power (magenta), mgmt (green)
+  for (let z = -19; z >= -11; z--) {
+    vox(-24, 7, z, P.neonCyan,  { emissive: P.neonCyan  });
+    vox(-24, 6, z, 0xff44cc,    { emissive: 0xff44cc    });
+    vox(-24, 5, z, P.neonGreen, { emissive: P.neonGreen });
+  }
+  // Right wall: network (blue), power (amber)
+  for (let z = -19; z >= -11; z--) {
+    vox(-14, 7, z, P.neonBlue,  { emissive: P.neonBlue  });
+    vox(-14, 6, z, P.neonAmber, { emissive: P.neonAmber });
+  }
+  // Horizontal trim bands on all walls (lighter strip at y=3 = skirting)
+  for (let x = -23; x <= -15; x++) {
+    vox(x, 2, -20, 0x14202e);
+    vox(x, 3, -20, 0x14202e);
+    vox(x, 2, -10, 0x18283a);
+    vox(x, 3, -10, 0x18283a);
+  }
+
+  // ── NatWest branding on back wall ──
+  fillBox(-24, 7, -20, -14, 8, -20, 0x3F0E40);
+  // Brand colour blocks spelling out NatWest identity
+  vox(-23, 7, -20, P.natwestRed, { emissive: P.natwestRed });
+  vox(-22, 7, -20, P.natwestRed, { emissive: P.natwestRed });
+  vox(-21, 7, -20, P.neonBlue,   { emissive: P.neonBlue   });
+  vox(-20, 7, -20, P.neonBlue,   { emissive: P.neonBlue   });
+  vox(-19, 7, -20, P.neonGreen,  { emissive: P.neonGreen  });
+  vox(-18, 7, -20, P.neonGreen,  { emissive: P.neonGreen  });
+  vox(-17, 7, -20, P.neonAmber,  { emissive: P.neonAmber  });
+  vox(-16, 7, -20, P.neonAmber,  { emissive: P.neonAmber  });
+
+  // ── CRAC cooling units in the rack gaps ──
+  buildCRAC(-22, 2, -19);  // left gap, row A
+  buildCRAC(-16, 2, -19);  // right gap, row A
+  buildCRAC(-22, 2, -15);  // left gap, row C (fault zone)
+  buildCRAC(-16, 2, -13);  // right gap, row D
+
+  // ── Overhead cable management trays (N-S runs on ceiling) ──
+  for (let x = -23; x <= -15; x++) {
+    vox(x, 8, -18, P.neonCyan,  { emissive: P.neonCyan  }); // over cold aisle A
+    vox(x, 8, -16, 0xff44cc,    { emissive: 0xff44cc    }); // over hot aisle
+    vox(x, 8, -14, P.neonCyan,  { emissive: P.neonCyan  }); // over cold aisle B
+    vox(x, 8, -12, P.neonGreen, { emissive: P.neonGreen }); // NOC run
+  }
+  // Vertical drops from tray to racks
+  for (const dropX of [-23, -21, -19, -17, -15]) {
+    for (let y = 6; y <= 8; y++) {
+      vox(dropX, y, -18, P.neonCyan, { emissive: P.neonCyan });
+      vox(dropX, y, -16, 0xff44cc,   { emissive: 0xff44cc   });
     }
   }
-  // More racks facing other way
-  for (let i = 0; i < 3; i++) {
-    const x = -22 + i * 2;
-    fillBox(x, 2, -12, x+1, 5, -12, P.server);
-    for (let u = 0; u < 4; u++) vox(x, 2+u, -13, P.ledGreen, { emissive: P.ledGreen });
+
+  // ── Rack positions (5 individual 1-wide racks per row) ──
+  const rxs = [-23, -21, -19, -17, -15];
+
+  // Row A — z=-19, against back wall: all healthy
+  rxs.forEach((rx, i) => {
+    const pat = [
+      ['G','G','G','G','G','G'],
+      ['G','G','G','A','G','G'],
+      ['G','G','G','G','G','B'],
+      ['G','A','G','G','G','G'],
+      ['G','G','G','G','B','G'],
+    ][i];
+    buildRack(rx, 2, -19, pat);
+  });
+
+  // ── Cold Aisle A — z=-18 (blue grate floor, player walkable) ──
+  for (let x = -24; x <= -14; x++)
+    vox(x, 2, -18, x % 2 === 0 ? P.neonBlue : 0x0a1828, { emissive: x%2===0 ? P.neonBlue : 0 });
+
+  // Row B — z=-17: mixed health (degradation starting)
+  rxs.forEach((rx, i) => {
+    const pat = [
+      ['G','G','A','G','G','A'],
+      ['G','A','G','G','A','G'],
+      ['A','G','A','A','G','A'], // most degraded rack
+      ['G','G','G','A','G','G'],
+      ['G','A','G','G','G','A'],
+    ][i];
+    buildRack(rx, 2, -17, pat);
+  });
+
+  // ── Hot Aisle — z=-16: amber hazard stripes ──
+  for (let x = -24; x <= -14; x++)
+    vox(x, 2, -16, x%2===0 ? P.ledAmber : 0x1a0900, { emissive: x%2===0 ? P.ledAmber : 0 });
+  // Hot aisle warning strip on ceiling
+  for (let x = -23; x <= -15; x++)
+    vox(x, 8, -16, P.ledAmber, { emissive: P.ledAmber });
+
+  // Row C — z=-15: FAULT ROW (incident location — all red/amber)
+  rxs.forEach((rx, i) => {
+    const pat = [
+      ['R','R','A','R','R','R'],
+      ['A','R','R','A','R','R'],
+      ['R','R','R','R','R','R'], // total failure
+      ['R','A','R','R','A','R'],
+      ['R','R','A','R','R','A'],
+    ][i];
+    buildRack(rx, 2, -15, pat);
+  });
+
+  // ── Cold Aisle B — z=-14 ──
+  for (let x = -24; x <= -14; x++)
+    vox(x, 2, -14, x%2===1 ? P.neonBlue : 0x0a1828, { emissive: x%2===1 ? P.neonBlue : 0 });
+
+  // Row D — z=-13: recovering (cyan = rebuild in progress)
+  rxs.forEach((rx, i) => {
+    const pat = [
+      ['G','C','G','G','C','G'],
+      ['C','G','C','G','G','C'],
+      ['G','G','C','G','C','G'],
+      ['C','G','G','C','G','G'],
+      ['G','C','G','G','C','C'],
+    ][i];
+    buildRack(rx, 2, -13, pat);
+  });
+
+  // ── NOC workstation (z=-11, x=-22 to -16) ──
+  // Desk surface
+  fillBox(-22, 2, -11, -16, 2, -11, P.deskTop);
+  fillBox(-22, 2, -11, -16, 3, -11, 0x2c1e0e);
+  // 5 monitors: alternating blue/amber/red/blue/blue
+  const monColors = [P.neonBlue, P.neonAmber, P.neonRed, P.neonBlue, P.neonBlue];
+  for (let i = 0; i < 5; i++) {
+    vox(-22+i, 3, -11, P.screenOn, { emissive: monColors[i] });
+    vox(-22+i, 4, -11, P.screenOn, { emissive: monColors[i] }); // tall monitors
   }
-  // Raised cable tray structure
-  fillBox(-23, 2, -17, -16, 2, -17, P.concreteDark);
-  // Neon fiber cable runs on floor — cyan primary data path
-  for (let x = -23; x <= -15; x++) vox(x, 2, -16, P.neonCyan, { emissive: P.neonCyan });
-  // Pink/magenta secondary path (like image 2 centre glow)
-  for (let x = -22; x <= -16; x++) vox(x, 2, -14, 0xff44cc, { emissive: 0xff44cc });
-  // Cable arcs up the racks (vertical cables)
-  for (let y = 2; y <= 7; y++) vox(-17, y, -18, P.neonCyan, { emissive: P.neonCyan });
-  for (let y = 2; y <= 6; y++) vox(-20, y, -18, 0xff44cc,   { emissive: 0xff44cc });
-  // Bright overhead strip lights
-  for (let x = -22; x <= -15; x++) vox(x, 8, -15, P.neonCyan, { emissive: P.neonCyan });
-  // Central glowing hub (where cables converge — the pink core in image 2)
-  fillBox(-19, 3, -17, -18, 5, -16, 0xff22bb, { emissive: 0xff22bb });
-  // Zone sign
-  zoneLabel(-19, 8, -15, 'DATA CENTRE', P.neonBlue);
+  // Monitor stand bases
+  for (const mx of [-22, -19, -16]) vox(mx, 2, -10, 0x1a2a3a);
+
+  // ── Emergency stop panel (left wall) ──
+  fillBox(-24, 3, -14, -24, 5, -14, 0x111111);
+  vox(-24, 4, -14, P.alertRed, { emissive: P.alertRed }); // E-STOP
+  vox(-24, 5, -14, P.neonAmber, { emissive: P.neonAmber }); // status
+
+  // ── Env monitoring display (right wall) ──
+  fillBox(-14, 3, -17, -14, 6, -13, 0x0a1828);
+  vox(-14, 5, -17, P.neonCyan,  { emissive: P.neonCyan  }); // temp ok
+  vox(-14, 4, -16, P.neonGreen, { emissive: P.neonGreen }); // humidity ok
+  vox(-14, 3, -15, P.ledAmber,  { emissive: P.ledAmber  }); // power warn
+  vox(-14, 5, -14, P.ledRed,    { emissive: P.ledRed    }); // alert
+
+  // ── Floor cable conduits running along centre ──
+  for (let z = -19; z >= -11; z--)
+    vox(-19, 2, z, z%2===0 ? P.neonCyan : 0x081828, { emissive: z%2===0 ? P.neonCyan : 0 });
+
+  zoneLabel(-19, 10, -15, 'NATWEST DATA CENTRE', P.neonBlue);
 }
 
 // Cloud & Infrastructure: x=14..24, z=12..20
@@ -243,33 +488,57 @@ function buildPayments() {
 // Trading Floor (mezzanine level y=9): x=-24..-8, z=-20..-10
 const MEZ = 9;
 function buildTradingFloor() {
-  fillFloor(-24, -8, -20, -10, MEZ, P.carpet);
+  // Floor — varied carpet tiles
+  for (let x = -24; x <= -8; x++)
+    for (let z = -20; z <= -10; z++)
+      setSolid(x, MEZ, z, ((x+z)%3===0) ? P.carpet : P.carpetLit);
+
   fillFloor(-24, -8, -20, -10, MEZ+5, P.ceiling);
-  fillBox(-24, MEZ+1, -20, -8, MEZ+5, -20, P.wall);
-  fillBox(-24, MEZ+1, -10, -8, MEZ+5, -10, P.wallTrim);
+  // Walls with panelling
+  fillBox(-24, MEZ+1, -20, -8,  MEZ+5, -20, P.wall);
+  fillBox(-24, MEZ+1, -10, -8,  MEZ+5, -10, P.wallTrim);
   fillBox(-24, MEZ+1, -20, -24, MEZ+5, -10, P.wall);
-  fillBox(-8, MEZ+1, -20, -8, MEZ+5, -10, P.wallTrim);
-  // Trading desks
+  fillBox(-8,  MEZ+1, -20, -8,  MEZ+5, -10, P.wallTrim);
+  // Trim bands on walls
+  for (let x = -23; x <= -9; x++) {
+    vox(x, MEZ+2, -20, P.wallTrim);
+    vox(x, MEZ+4, -20, P.wallTrim);
+  }
+  // Ceiling: ticker strip
+  for (let x = -23; x <= -9; x += 2)
+    vox(x, MEZ+5, -15, P.neonAmber, { emissive: P.neonAmber });
+
+  // 6 trading stations with dual monitors + chairs
   for (let i = 0; i < 6; i++) {
-    const x = -23 + (i % 3) * 4;
-    const z = -19 + Math.floor(i / 3) * 4;
+    const x = -23 + (i % 3) * 5;
+    const z = -19 + Math.floor(i / 3) * 5;
+    // Desk surface (3-wide)
     fillBox(x, MEZ+1, z, x+2, MEZ+1, z, P.deskTop);
     fillBox(x, MEZ+1, z, x+2, MEZ+2, z, P.desk);
-    // Screens
-    vox(x, MEZ+3, z, P.screenOn, { emissive: P.neonAmber });
-    vox(x+2, MEZ+3, z, P.screenOn, { emissive: 0x004400 });
-    // Chair
-    fillBox(x+1, MEZ+1, z+1, x+1, MEZ+2, z+1, P.chair);
+    // Dual monitors
+    vox(x,   MEZ+3, z, P.screenOn, { emissive: P.neonAmber });
+    vox(x+1, MEZ+3, z, P.screenOn, { emissive: i < 2 ? P.neonRed : P.neonAmber });
+    vox(x+2, MEZ+3, z, P.screenOn, { emissive: P.neonBlue });
+    // Tall monitor stands
+    vox(x,   MEZ+4, z, P.screenOn, { emissive: P.neonAmber });
+    vox(x+2, MEZ+4, z, P.screenOn, { emissive: P.neonBlue });
+    // Chair: seat + back
+    vox(x+1, MEZ+1, z+1, P.chair);
+    vox(x+1, MEZ+2, z+1, P.chair);
+    vox(x+1, MEZ+3, z+1, 0x2a1040); // chair back (aubergine)
+    // Coffee cup
+    vox(x+1, MEZ+2, z, P.pot);
   }
-  // Alert beacon
-  vox(-16, MEZ+4, -15, P.alertRed, { emissive: P.alertRed });
+  // Alert beacons
+  vox(-16, MEZ+4, -15, P.alertRed,   { emissive: P.alertRed   });
   vox(-15, MEZ+4, -15, P.alertAmber, { emissive: P.alertAmber });
+  vox(-14, MEZ+4, -15, P.alertRed,   { emissive: P.alertRed   });
   // Railing overlooking atrium
   for (let x = -22; x <= -10; x++) {
     vox(x, MEZ+1, -10, P.railing);
     vox(x, MEZ+2, -10, P.railingTop, { emissive: P.neonBlue });
   }
-  zoneLabel(-16, MEZ+5, -15, 'TRADING FLOOR', P.neonAmber);
+  zoneLabel(-16, MEZ+6, -15, 'TRADING FLOOR', P.neonAmber);
 }
 
 // Operations Centre (mezzanine): x=8..24, z=-20..-10
@@ -406,31 +675,132 @@ function buildStaircasesAndBridges() {
 }
 
 function addDetails() {
-  // Plants in atrium
-  [[-12,-12],[-12,12],[12,-12],[12,12]].forEach(([x,z]) => {
-    vox(x, 2, z, P.pot);
-    vox(x, 3, z, P.plant);
+  // ── Atrium: tall potted plants in corners ──
+  [[-20,-16],[-20,16],[20,-16],[20,16],[-12,-16],[-12,16],[12,-16],[12,16]].forEach(([x,z]) => {
+    vox(x, 2, z, P.pot);       // ceramic pot
+    vox(x, 3, z, P.plantDark); // stem
     vox(x-1, 4, z, P.plant); vox(x+1, 4, z, P.plant);
-    vox(x, 4, z-1, P.plant); vox(x, 4, z+1, P.plant);
+    vox(x, 4, z-1, P.plant);  vox(x, 4, z+1, P.plant);
+    vox(x, 5, z, P.plant);
+    vox(x-1, 5, z, P.plantDark); vox(x+1, 5, z, P.plantDark);
   });
-  // Atrium lighting strips on ceiling (above corridor ring)
-  for (let x = -6; x <= 6; x++) vox(x, 9, -7, P.neonBlue, { emissive: P.neonBlue });
-  for (let x = -6; x <= 6; x++) vox(x, 9,  7, P.neonBlue, { emissive: P.neonBlue });
-  for (let z = -6; z <= 6; z++) vox(-7, 9, z, P.neonPurple, { emissive: P.neonPurple });
-  for (let z = -6; z <= 6; z++) vox( 7, 9, z, P.neonPurple, { emissive: P.neonPurple });
-  // Some desks in main atrium floor (reception area)
-  fillBox(-6, 2, -5, -4, 2, -5, P.deskTop);
-  fillBox( 4, 2, -5,  6, 2, -5, P.deskTop);
-  // Wayfinding arrow strips on floor
-  for (let i = 0; i < 3; i++) vox(-3+i, 2, -9, P.neonAmber, { emissive: P.neonAmber });
-  for (let i = 0; i < 3; i++) vox(-3+i, 2,  9, P.neonGreen, { emissive: P.neonGreen });
+
+  // ── Corridor lighting strips at zone transitions ──
+  for (let x = -6; x <= 6; x++) {
+    vox(x, 9, -9, P.neonBlue, { emissive: P.neonBlue });
+    vox(x, 9,  9, P.neonBlue, { emissive: P.neonBlue });
+  }
+  for (let z = -8; z <= 8; z++) {
+    vox(-9, 9, z, P.neonPurple, { emissive: P.neonPurple });
+    vox(  9, 9, z, P.neonPurple, { emissive: P.neonPurple });
+  }
+
+  // ── Wayfinding floor arrows ──
+  for (let i = 0; i < 3; i++) {
+    vox(-1+i, 2, -11, P.neonAmber, { emissive: P.neonAmber });
+    vox(-1+i, 2,  11, P.neonGreen, { emissive: P.neonGreen });
+    vox(-11,  2, -1+i, P.neonRed,  { emissive: P.neonRed   });
+    vox( 11,  2, -1+i, P.neonCyan, { emissive: P.neonCyan  });
+  }
+
+  // ── Drink/snack machine near entrance ──
+  vox(-21, 2, -6, 0x1a1a2a);
+  vox(-21, 3, -6, P.screenOn, { emissive: P.neonCyan });
+  vox(-21, 4, -6, P.screenOn, { emissive: P.neonCyan });
+  vox(-21, 5, -6, 0x2a2a3a);
+  // Second machine
+  vox(-21, 2, -4, 0x1a2a1a);
+  vox(-21, 3, -4, P.screenOn, { emissive: P.neonGreen });
+  vox(-21, 4, -4, P.screenOn, { emissive: P.neonGreen });
+  vox(-21, 5, -4, 0x1a2a1a);
+
+  // ── Security turnstile by atrium entrance ──
+  for (const tx of [-2, 0, 2]) {
+    vox(tx, 2, 17, 0x1a1030);
+    vox(tx, 3, 17, P.neonBlue, { emissive: P.neonBlue });
+  }
+
+  // ── Mezzanine railing along atrium void ──
+  for (let x = -7; x <= 7; x++) {
+    vox(x, MEZ+1, -9, 0x3a1850);
+    vox(x, MEZ+2, -9, P.neonBlue, { emissive: P.neonBlue });
+    vox(x, MEZ+1,  9, 0x3a1850);
+    vox(x, MEZ+2,  9, P.neonGreen, { emissive: P.neonGreen });
+  }
+  for (let z = -9; z <= 9; z++) {
+    vox(-7, MEZ+1, z, 0x3a1850);
+    vox(-7, MEZ+2, z, P.neonPurple, { emissive: P.neonPurple });
+    vox( 7, MEZ+1, z, 0x3a1850);
+    vox( 7, MEZ+2, z, P.neonPurple, { emissive: P.neonPurple });
+  }
+
+  // ── Extra detail in zone corridors ──
+  // Extinguisher cabinets every 8 blocks along corridors
+  for (const [ex,ez] of [[-23,0],[23,0],[0,-19],[0,19],[-10,-10],[10,-10],[-10,10],[10,10]]) {
+    vox(ex, 2, ez, 0x1a0a0a);
+    vox(ex, 3, ez, P.alertRed, { emissive: P.alertRed });
+  }
+
+  // ── Trading floor: extra screens and props ──
+  for (let x = -22; x <= -10; x += 3) {
+    vox(x, MEZ+5, -11, P.neonAmber, { emissive: P.neonAmber }); // ceiling tickers
+  }
+
+  // ── Operations centre: wall-mounted screens ──
+  fillBox(10, MEZ+2, -19, 22, MEZ+4, -19, P.screenOn, { emissive: P.neonBlue });
+  // Individual screen panels within the monitoring wall
+  for (let x = 10; x <= 22; x += 3)
+    vox(x, MEZ+3, -19, P.screenOn, { emissive: x < 16 ? P.neonGreen : P.neonAmber });
+
+  // ── Security: biometric scanners on mez ──
+  for (const [sx,sz] of [[-20,12],[-16,12],[-12,12]]) {
+    vox(sx, MEZ+3, sz, P.screenOn, { emissive: P.neonRed });
+    vox(sx, MEZ+4, sz, P.neonRed,  { emissive: P.neonRed });
+  }
 }
 
 // Zone label helper (thin vertical sign built from blocks)
 function zoneLabel(x, y, z, _name, _color) {
-  // Physical block sign
   vox(x, y, z, P.wall);
   vox(x, y+1, z, _color, { emissive: _color });
+}
+
+// Detailed 1-wide rack column. statuses = array of chars per U-slot:
+//   G=green(ok), A=amber(warn), R=red(fault), C=cyan(rebuild), B=blue(idle), W=off
+function buildRack(x, baseY, z, statuses) {
+  const LED = {
+    G: P.ledGreen, A: P.ledAmber, R: P.ledRed,
+    C: P.neonCyan, B: P.neonBlue, W: 0x223344
+  };
+  // Rack body tones alternate slightly per U-slot to simulate panel seams
+  const tones = [0x06101c, 0x091420, 0x0a121e, 0x081018, 0x0c1528, 0x080f1a, 0x0b1326];
+  for (let i = 0; i < statuses.length; i++) {
+    const em = LED[statuses[i]] ?? P.ledGreen;
+    setSolid(x, baseY + i, z, tones[i % tones.length], { emissive: em });
+  }
+  setSolid(x, baseY + statuses.length,     z, 0x192838); // cable mgmt bar
+  setSolid(x, baseY + statuses.length + 1, z, 0x0c1424); // vent cap
+}
+
+// CRAC cooling unit (1 wide, 4 tall)
+function buildCRAC(x, baseY, z) {
+  setSolid(x, baseY,   z, 0x05101a);
+  setSolid(x, baseY+1, z, 0x081828, { emissive: P.neonCyan });
+  setSolid(x, baseY+2, z, 0x091a30, { emissive: P.neonBlue });
+  setSolid(x, baseY+3, z, 0x0a1c32, { emissive: P.neonCyan });
+  setSolid(x, baseY+4, z, 0x0c2040);
+}
+
+// Column / pillar (1×1 footprint, decorative — aubergine base, neon cap)
+function buildColumn(x, baseY, z, h, capColor) {
+  for (let y = 0; y < h; y++) {
+    setSolid(x, baseY + y, z,
+      y === 0        ? 0x2a0a30 :
+      y === h-1      ? capColor  :
+      y % 4 === 0    ? P.wallTrim :
+                       P.wall,
+      y === h-1 ? { emissive: capColor } : {});
+  }
 }
 
 // ─── Three.js setup ───────────────────────────────────────────────────────────
