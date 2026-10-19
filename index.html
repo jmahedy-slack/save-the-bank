@@ -7,127 +7,183 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #090817; overflow: hidden; font-family: 'Courier New', monospace; color: #fff; }
-  #canvas { display: block; image-rendering: pixelated; }
+  #renderer-container { position: fixed; inset: 0; }
+  canvas { display: block; }
 
-  /* HUD */
+  /* ── HUD ── */
   #hud {
-    position: fixed; top: 0; left: 0; right: 0;
-    display: flex; align-items: center; gap: 12px;
-    padding: 8px 14px; background: rgba(9,8,23,0.88);
-    border-bottom: 2px solid #3F0E40; z-index: 10; flex-wrap: wrap;
+    position: fixed; top: 0; left: 0; right: 0; height: 62px;
+    background: rgba(9,8,23,0.90); border-bottom: 2px solid #3F0E40;
+    display: flex; align-items: stretch; z-index: 20;
+    backdrop-filter: blur(4px);
   }
-  .hud-block { display: flex; flex-direction: column; align-items: center; min-width: 70px; }
-  .hud-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
-  .hud-value { font-size: 16px; font-weight: bold; }
-  .hud-sep { width: 1px; height: 36px; background: #3F0E40; }
-  #timer-val { color: #ECB22E; }
-  #score-val { color: #36C5F0; }
-  #health-bar-wrap { display: flex; align-items: center; gap: 6px; }
-  #health-bar { width: 80px; height: 10px; background: #1a1030; border: 1px solid #3F0E40; border-radius: 3px; overflow: hidden; }
-  #health-fill { height: 100%; background: #2EB67D; transition: width 0.3s, background 0.3s; }
-  #incident-label { font-size: 10px; color: #E01E5A; text-transform: uppercase; letter-spacing: 1px; }
-  #incident-text { font-size: 12px; color: #fff; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud-cell {
+    display: flex; align-items: center; gap: 10px;
+    padding: 0 18px; border-right: 1px solid rgba(63,14,64,0.7);
+  }
+  .hud-cell:last-child { border-right: none; margin-left: auto; }
+
+  /* title cell */
+  #hud-title { flex-direction: column; align-items: flex-start; gap: 0; padding: 0 16px; min-width: 220px; }
+  #hud-portrait {
+    width: 36px; height: 36px; border: 2px solid #36C5F0; border-radius: 4px;
+    background: #1a0a2a; flex-shrink: 0; overflow: hidden; margin: 0 10px 0 8px;
+  }
+  #hud-portrait canvas { width: 36px; height: 36px; }
+  .hud-game-title { font-size: 13px; font-weight: bold; color: #E01E5A; letter-spacing: 1.5px; line-height: 1.2; }
+  .hud-subtitle { font-size: 9px; color: #888; letter-spacing: 0.5px; }
+
+  /* timer cell */
+  .hud-icon { font-size: 18px; }
+  .hud-block { display: flex; flex-direction: column; }
+  .hud-label { font-size: 8px; text-transform: uppercase; letter-spacing: 1.5px; color: #666; }
+  #timer-val { font-size: 24px; font-weight: bold; color: #ECB22E; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+
+  /* health cell */
+  #health-wrap { display: flex; flex-direction: column; gap: 4px; }
+  #health-bar { width: 120px; height: 12px; background: #1a1030; border: 1px solid #3F0E40; border-radius: 2px; overflow: hidden; }
+  #health-fill { height: 100%; background: #2EB67D; transition: width 0.4s, background 0.4s; }
+  #health-pct { font-size: 14px; font-weight: bold; color: #2EB67D; }
+
+  /* incidents cell */
+  #incidents-val { font-size: 22px; font-weight: bold; color: #fff; }
+  #incidents-label { font-size: 10px; color: #E01E5A; font-weight: bold; letter-spacing: 1px; }
+
+  /* hint btn */
   #hint-btn {
-    margin-left: auto; padding: 5px 12px; background: #3F0E40; border: 1px solid #36C5F0;
-    color: #36C5F0; font-family: inherit; font-size: 11px; cursor: pointer; border-radius: 3px; letter-spacing: 1px;
+    padding: 6px 14px; background: transparent; border: 1px solid #36C5F0;
+    color: #36C5F0; font-family: inherit; font-size: 11px; cursor: pointer;
+    border-radius: 3px; letter-spacing: 1px; white-space: nowrap;
   }
   #hint-btn:hover { background: #36C5F0; color: #090817; }
 
-  /* Overlay panels */
+  /* ── Overlays ── */
   .overlay {
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(9,8,23,0.92); z-index: 100;
   }
   .panel {
-    background: #120d2a; border: 2px solid #3F0E40; border-radius: 8px;
-    padding: 32px 40px; max-width: 520px; width: 90%; text-align: center;
+    background: #120d2a; border: 2px solid #3F0E40; border-radius: 10px;
+    padding: 36px 44px; max-width: 540px; width: 90%; text-align: center;
   }
-  .panel h1 { font-size: 28px; color: #E01E5A; letter-spacing: 2px; margin-bottom: 4px; }
-  .panel h2 { font-size: 18px; color: #36C5F0; margin-bottom: 16px; letter-spacing: 1px; }
-  .panel p { color: #aaa; font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
-  .panel ul { text-align: left; color: #ccc; font-size: 12px; line-height: 2; margin-bottom: 20px; list-style: none; }
+  .panel h1 { font-size: 32px; color: #E01E5A; letter-spacing: 3px; margin-bottom: 2px; }
+  .panel h2 { font-size: 16px; color: #36C5F0; margin-bottom: 18px; letter-spacing: 2px; text-transform: uppercase; }
+  .panel p  { color: #aaa; font-size: 13px; line-height: 1.7; margin-bottom: 14px; }
+  .panel ul { text-align: left; color: #ccc; font-size: 12px; line-height: 2.2; margin-bottom: 22px; list-style: none; padding: 0 10px; }
   .panel ul li::before { content: "▶  "; color: #36C5F0; }
   .btn {
-    display: inline-block; padding: 10px 28px; background: #E01E5A; color: #fff;
+    display: inline-block; padding: 11px 32px; background: #E01E5A; color: #fff;
     font-family: inherit; font-size: 14px; font-weight: bold; letter-spacing: 2px;
-    border: none; border-radius: 4px; cursor: pointer; text-transform: uppercase;
+    border: none; border-radius: 5px; cursor: pointer; text-transform: uppercase; margin: 4px;
   }
-  .btn:hover { background: #ff2d6e; }
+  .btn:hover { filter: brightness(1.2); }
   .btn-green { background: #2EB67D; }
-  .btn-green:hover { background: #3dcf8e; }
-  .btn-blue { background: #36C5F0; color: #090817; }
-  .btn-blue:hover { background: #5cd5ff; }
+  .btn-blue  { background: #36C5F0; color: #090817; }
 
-  /* Dialog box */
+  /* ── Dialog ── */
   #dialog {
-    position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
-    width: min(600px, 94vw); background: #120d2a; border: 2px solid #36C5F0;
-    border-radius: 6px; padding: 14px 20px; z-index: 50; display: none;
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    width: min(640px, 94vw); background: rgba(12,8,30,0.96); border: 2px solid #36C5F0;
+    border-radius: 8px; padding: 16px 22px; z-index: 50; display: none;
+    backdrop-filter: blur(6px);
   }
-  #dialog-who { font-size: 10px; color: #36C5F0; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-  #dialog-text { font-size: 13px; color: #fff; line-height: 1.5; }
-  #dialog-action { margin-top: 10px; font-size: 11px; color: #ECB22E; }
+  #dialog-who { font-size: 9px; color: #36C5F0; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 5px; }
+  #dialog-text { font-size: 13px; color: #fff; line-height: 1.6; white-space: pre-line; }
+  #dialog-action { margin-top: 10px; font-size: 10px; color: #ECB22E; letter-spacing: 1px; }
 
-  /* Evidence panel */
-  #evidence-panel {
-    position: fixed; right: 14px; top: 60px; width: 200px;
-    background: rgba(9,8,23,0.88); border: 1px solid #3F0E40; border-radius: 6px;
-    padding: 10px; z-index: 10; display: none;
-  }
-  #evidence-panel h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 8px; }
-  .ev-item { font-size: 11px; color: #ECB22E; padding: 3px 0; border-bottom: 1px solid #1a1030; }
-
-  /* Notification toast */
+  /* ── Toast ── */
   #toast {
-    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
-    background: #2EB67D; color: #090817; font-size: 13px; font-weight: bold;
-    padding: 8px 20px; border-radius: 4px; z-index: 200; display: none;
-    letter-spacing: 1px;
+    position: fixed; top: 72px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; font-weight: bold; padding: 8px 22px; border-radius: 4px;
+    z-index: 200; display: none; letter-spacing: 1px; pointer-events: none;
   }
 
-  /* Interaction prompt */
+  /* ── Interact prompt ── */
   #interact-prompt {
     position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
     font-size: 12px; color: #ECB22E; letter-spacing: 1px;
-    background: rgba(9,8,23,0.7); padding: 4px 12px; border-radius: 3px;
-    display: none; z-index: 10;
+    background: rgba(9,8,23,0.8); padding: 5px 14px; border-radius: 3px;
+    border: 1px solid rgba(236,178,46,0.4); display: none; z-index: 30;
   }
+
+  /* ── Evidence panel ── */
+  #evidence-panel {
+    position: fixed; right: 14px; top: 72px; width: 210px;
+    background: rgba(9,8,23,0.88); border: 1px solid #3F0E40; border-radius: 6px;
+    padding: 10px 12px; z-index: 20; display: none;
+  }
+  #evidence-panel h3 { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: #666; margin-bottom: 8px; }
+  .ev-item { font-size: 11px; color: #ECB22E; padding: 4px 0; border-bottom: 1px solid #1a1030; line-height: 1.4; }
+
+  /* ── Minimap ── */
+  #minimap {
+    position: fixed; bottom: 18px; right: 14px; width: 140px; height: 100px;
+    background: rgba(9,8,23,0.85); border: 1px solid #3F0E40; border-radius: 5px;
+    z-index: 20; overflow: hidden; display: none;
+  }
+  #minimap canvas { display: block; }
+  #minimap-label { font-size: 8px; color: #555; text-align: center; letter-spacing: 1px; padding: 2px; }
+
+  /* ── End screen ── */
+  #end-grade { font-size: 72px; font-weight: bold; margin-bottom: 4px; }
+  #end-score  { font-size: 22px; color: #36C5F0; margin: 10px 0; }
 </style>
 </head>
 <body>
-<canvas id="canvas"></canvas>
+
+<!-- 3D renderer lives here -->
+<div id="renderer-container"></div>
 
 <!-- HUD -->
 <div id="hud">
-  <div class="hud-block">
-    <span class="hud-label">Timer</span>
-    <span class="hud-value" id="timer-val">5:00</span>
-  </div>
-  <div class="hud-sep"></div>
-  <div class="hud-block">
-    <span class="hud-label">Score</span>
-    <span class="hud-value" id="score-val">0</span>
-  </div>
-  <div class="hud-sep"></div>
-  <div class="hud-block">
-    <span class="hud-label">Bank Health</span>
-    <div id="health-bar-wrap">
-      <div id="health-bar"><div id="health-fill" style="width:100%"></div></div>
-      <span id="health-pct" style="font-size:12px;color:#2EB67D">100%</span>
+  <div id="hud-portrait-wrap" class="hud-cell" style="padding:0 0 0 8px; gap:0; border-right: 1px solid rgba(63,14,64,0.7);">
+    <div id="hud-portrait"><canvas id="portrait-canvas" width="36" height="36"></canvas></div>
+    <div class="hud-cell" style="border:none; flex-direction:column; align-items:flex-start; gap:0; padding:0 12px;">
+      <span class="hud-game-title">SEV-1: SAVE THE BANK</span>
+      <span class="hud-subtitle">Restore services. Keep customers online.</span>
     </div>
   </div>
-  <div class="hud-sep"></div>
-  <div class="hud-block" style="align-items:flex-start">
-    <span class="hud-label" id="incident-label">Active Incident</span>
-    <span class="hud-value" id="incident-text" style="font-size:12px">—</span>
+
+  <div class="hud-cell">
+    <span class="hud-icon">⏱</span>
+    <div class="hud-block">
+      <span class="hud-label">Time Remaining</span>
+      <span id="timer-val">05:00</span>
+    </div>
   </div>
-  <button id="hint-btn">H — Hint</button>
+
+  <div class="hud-cell">
+    <span class="hud-icon" style="color:#E01E5A">♥</span>
+    <div class="hud-block" style="gap:4px">
+      <span class="hud-label">Bank Health</span>
+      <div id="health-bar"><div id="health-fill" style="width:100%"></div></div>
+      <span id="health-pct">100%</span>
+    </div>
+  </div>
+
+  <div class="hud-cell">
+    <span class="hud-icon" style="color:#E01E5A">⚠</span>
+    <div class="hud-block">
+      <span class="hud-label">Incidents</span>
+      <span id="incidents-val">0 / 5 <span id="incidents-label" style="font-size:11px">RESOLVED</span></span>
+    </div>
+  </div>
+
+  <div class="hud-cell" style="margin-left:auto; border-left: 1px solid rgba(63,14,64,0.7); border-right:none;">
+    <button id="hint-btn">H — AI HINT</button>
+  </div>
 </div>
 
 <!-- Evidence panel -->
 <div id="evidence-panel">
   <h3>Evidence Collected</h3>
   <div id="evidence-list"></div>
+</div>
+
+<!-- Minimap -->
+<div id="minimap">
+  <canvas id="minimap-canvas" width="140" height="90"></canvas>
+  <div id="minimap-label">BUILDING MAP</div>
 </div>
 
 <!-- Dialog -->
@@ -143,20 +199,21 @@
 <!-- Interact prompt -->
 <div id="interact-prompt"></div>
 
-<!-- Title screen overlay -->
+<!-- Title screen -->
 <div class="overlay" id="title-overlay">
   <div class="panel">
     <h1>SEV-1</h1>
-    <h2>SAVE THE BANK</h2>
-    <p>A critical banking service is down. You are the incident responder.<br>
-    Explore, investigate, diagnose and fix before customers feel the impact.</p>
+    <h2>Save the Bank</h2>
+    <p>A critical SEV-1 incident is active across the NatWest banking infrastructure.<br>
+    You are the incident responder. Explore the building, investigate systems,<br>
+    apply fixes and restore services before customers feel the full impact.</p>
     <ul>
       <li>WASD / Arrow Keys — Move</li>
-      <li>E — Interact</li>
-      <li>H — AI Hint</li>
+      <li>E — Interact with systems</li>
+      <li>H — AI hint</li>
       <li>P / Esc — Pause</li>
     </ul>
-    <button class="btn" id="start-btn">START MISSION</button>
+    <button class="btn" id="start-btn">DEPLOY TO INCIDENT</button>
   </div>
 </div>
 
@@ -164,22 +221,29 @@
 <div class="overlay" id="pause-overlay" style="display:none">
   <div class="panel">
     <h2>PAUSED</h2>
-    <p>Take a breath. The bank needs you back soon.</p>
-    <button class="btn btn-blue" id="resume-btn">RESUME</button>
+    <p>The bank is waiting.</p>
+    <button class="btn btn-blue" id="resume-btn">RESUME MISSION</button>
   </div>
 </div>
 
-<!-- End overlay -->
+<!-- End screen -->
 <div class="overlay" id="end-overlay" style="display:none">
-  <div class="panel" id="end-panel">
-    <h1 id="end-grade">S</h1>
+  <div class="panel">
+    <div id="end-grade">S</div>
     <h2 id="end-title">SEV-1 CHAMPION</h2>
     <p id="end-summary"></p>
-    <p id="end-score" style="color:#36C5F0;font-size:20px;margin:12px 0"></p>
+    <div id="end-score"></div>
     <button class="btn btn-green" id="replay-btn">PLAY AGAIN</button>
   </div>
 </div>
 
-<script src="game.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "/vendor/three.module.min.js"
+  }
+}
+</script>
+<script type="module" src="game.js"></script>
 </body>
 </html>

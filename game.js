@@ -1,905 +1,965 @@
 /**
- * SEV-1: Save the Bank — NatWest Engineering Arcade
- * 2D canvas top-down incident response game
+ * SEV-1: Save the Bank — 3D Voxel World
+ * Three.js isometric banking headquarters
  */
-(function () {
-  'use strict';
+import * as THREE from 'three';
 
-  // ─── Constants ─────────────────────────────────────────────────────────────
-  const TILE = 32;
-  const PAL = {
-    bg:       '#090817',
-    floor:    '#1a1030',
-    floor2:   '#160c2a',
-    wall:     '#3F0E40',
-    wallLit:  '#5a1560',
-    carpet:   '#1e0e35',
-    counter:  '#2a1840',
-    aubergine:'#3F0E40',
-    blue:     '#36C5F0',
-    green:    '#2EB67D',
-    amber:    '#ECB22E',
-    red:      '#E01E5A',
-    white:    '#FFFFFF',
-    grey:     '#555577',
-    darkGrey: '#222233',
-    neonBlue: '#00e5ff',
-    neonGreen:'#00ff88',
-    neonRed:  '#ff003c',
-    neonAmber:'#ffcc00',
-    serverRack:'#1c2a3a',
-    screen:   '#001833',
-    terminal: '#001122',
-    desk:     '#2a1e0e',
-    plant:    '#1a3a1a',
-  };
+// ── Palette ──────────────────────────────────────────────────────────────────
+const C = {
+  bg:        0x090817,
+  floor:     0x1a1030,
+  floor2:    0x160c28,
+  carpet:    0x1e0e35,
+  wall:      0x3F0E40,
+  wallTop:   0x5a1a60,
+  glass:     0x1a3a6a,
+  glassLit:  0x2a5aaa,
+  desk:      0x2a1e10,
+  deskTop:   0x3a2e18,
+  server:    0x0a1a2a,
+  serverLit: 0x0f2a3f,
+  screen:    0x001833,
+  screenOn:  0x003366,
+  neonBlue:  0x36C5F0,
+  neonCyan:  0x00e5ff,
+  neonGreen: 0x2EB67D,
+  neonRed:   0xE01E5A,
+  neonAmber: 0xECB22E,
+  purple:    0x6a2a8a,
+  aubergine: 0x3F0E40,
+  white:     0xffffff,
+  offWhite:  0xe0e0f0,
+  concrete:  0x2a2a3a,
+  railing:   0x1a1040,
+};
 
-  // Tile types
-  const T = {
-    FLOOR:   0,
-    WALL:    1,
-    DESK:    2,
-    SERVER:  3,
-    TERMINAL:4,
-    ATM:     5,
-    PLANT:   6,
-    CARPET:  7,
-    COUNTER: 8,
-    ALERT:   9,
-    DOOR:    10,
-    MONITOR: 11,
-    RACK:    12,
-  };
+// ── Scene & Renderer ──────────────────────────────────────────────────────────
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.FogExp2(C.bg, 0.018);
 
-  // ─── Game state ─────────────────────────────────────────────────────────────
-  let state = 'title'; // title | playing | paused | end
-  let score = 0;
-  let health = 100;
-  let timeLeft = 300; // seconds
-  let lastTime = 0;
-  let timerRunning = false;
-  let evidenceCollected = [];
-  let incidentState = 'detected'; // detected|investigating|diagnosed|remediating|validating|resolved
-  let hintCooldown = 0;
-  let interactTarget = null;
-  let dialogQueue = [];
-  let dialogOpen = false;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.getElementById('renderer-container').appendChild(renderer.domElement);
 
-  // ─── Canvas setup ───────────────────────────────────────────────────────────
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
+function resizeRenderer() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resizeRenderer);
 
-  function resize() {
-    canvas.width  = window.innerWidth;
-    canvas.height = window.innerHeight;
+// ── Camera ────────────────────────────────────────────────────────────────────
+// Isometric-ish perspective camera
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 300);
+camera.position.set(0, 28, 28);
+camera.lookAt(0, 0, 0);
+resizeRenderer();
+
+const camTarget = new THREE.Vector3();
+const camOffset = new THREE.Vector3(0, 28, 28);
+
+// ── Lights ────────────────────────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0x1a0f30, 0.8);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xe8d0ff, 1.2);
+sunLight.position.set(20, 40, 20);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 120;
+sunLight.shadow.camera.left = -50;
+sunLight.shadow.camera.right = 50;
+sunLight.shadow.camera.top = 50;
+sunLight.shadow.camera.bottom = -50;
+scene.add(sunLight);
+
+// Accent lights
+function addPointLight(x, y, z, color, intensity, distance) {
+  const l = new THREE.PointLight(color, intensity, distance);
+  l.position.set(x, y, z);
+  scene.add(l);
+  return l;
+}
+const atrium1 = addPointLight(0, 4, 0,  0x36C5F0, 3, 25);
+const atrium2 = addPointLight(0, 8, 0,  0x8833ff, 2, 30);
+addPointLight(-18, 3, -8,  0xff2244, 2, 18);   // data centre alert
+addPointLight( 18, 3,  8,  0x36C5F0, 2, 16);   // cloud
+addPointLight(-18, 3,  8,  0xECB22E, 1.5, 14); // payments
+addPointLight( 18, 3, -8,  0x2EB67D, 1.5, 14); // ops centre
+
+// Hemisphere sky
+const hemi = new THREE.HemisphereLight(0x2a1040, 0x090817, 0.5);
+scene.add(hemi);
+
+// ── Geometry factory ─────────────────────────────────────────────────────────
+const matCache = new Map();
+function mat(color, opts = {}) {
+  const key = `${color}_${opts.emissive || 0}_${opts.metalness || 0}_${opts.roughness ?? 0.8}_${opts.transparent || 0}_${opts.opacity ?? 1}`;
+  if (!matCache.has(key)) {
+    const m = new THREE.MeshStandardMaterial({
+      color,
+      emissive:    opts.emissive  ? new THREE.Color(opts.emissive) : undefined,
+      emissiveIntensity: opts.emissiveIntensity ?? (opts.emissive ? 0.6 : 0),
+      metalness:   opts.metalness   ?? 0,
+      roughness:   opts.roughness   ?? 0.8,
+      transparent: opts.transparent ?? false,
+      opacity:     opts.opacity      ?? 1,
+    });
+    matCache.set(key, m);
   }
-  window.addEventListener('resize', resize);
-  resize();
+  return matCache.get(key);
+}
 
-  // ─── Camera ─────────────────────────────────────────────────────────────────
-  const cam = { x: 0, y: 0 };
+function box(w, h, d, color, opts) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const mesh = new THREE.Mesh(geo, mat(color, opts));
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
 
-  // ─── Player ─────────────────────────────────────────────────────────────────
-  const player = {
-    x: 5 * TILE, y: 5 * TILE,
-    w: 20, h: 20,
-    speed: 3,
-    dir: 'down',
-    animFrame: 0,
-    animTimer: 0,
-    moving: false,
-  };
+function addBox(parent, w, h, d, x, y, z, color, opts) {
+  const m = box(w, h, d, color, opts);
+  m.position.set(x, y, z);
+  parent.add(m);
+  return m;
+}
 
-  // ─── Input ──────────────────────────────────────────────────────────────────
-  const keys = {};
-  window.addEventListener('keydown', e => {
-    keys[e.key] = true;
-    if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && state === 'playing') togglePause();
-    if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && state === 'paused') togglePause();
-    if ((e.key === 'e' || e.key === 'E') && state === 'playing') doInteract();
-    if ((e.key === 'h' || e.key === 'H') && state === 'playing') showHint();
-  });
-  window.addEventListener('keyup', e => { keys[e.key] = false; });
+// ── Building constructor ──────────────────────────────────────────────────────
+const building = new THREE.Group();
+scene.add(building);
 
-  // ─── Map definition (Level 1 — Branch Operations) ───────────────────────────
-  // 28 cols × 20 rows
-  const MAP_W = 28;
-  const MAP_H = 20;
+// Floor helper
+function floor(x, z, w, d, y, color) {
+  addBox(building, w, 0.2, d, x, y, z, color);
+}
 
-  // prettier-ignore
-  const MAP_RAW = [
-    // 0         1         2
-    // 0123456789012345678901234567
-    'WWWWWWWWWWWWWWWWWWWWWWWWWWWW', // 0
-    'WF.FF.FF.FF.FF.FF.FF.FF.FF.W', // 1
-    'WF.CCCCCCCCCCCCCCCCCCCCCC.FW', // 2
-    'WF.CDDDDDDDDDDDDDDDDDDDDDC.W', // 3 -- counter row
-    'WF.CFFFFFFFFFFFFFFFFFFFFF C.W', // 4
-    'WF.CFFFFFFFFFF  FFFFFFFFFFF.W', // 5 spacing
-    'W ..FFFFFFFFF  FFFFFFFFFFFFFF', // 6
-    'W..FFFFFFFF  FFFFFFFFFFFFFFFF', // 7
-    'WF FF FFFFF FFFFFF FFFFF FF W', // 8
-    'WF FF FFFFF FFFFFF FFFFF FF W', // 9
-    'WF FF FFFFF FFFFFF FFFFF FF W', // 10
-    'WFFFFFFFFFFFFFFFFFFFFFFFFFFF W', // 11
-    'W TTTTTTT  ATTTTT  TTTTTTT  W', // 12 -- terminals row
-    'W TTTTTTT  ATTTTT  TTTTTTT  W', // 13
-    'WFFFFFFFFFFFFFFFFFFFFFFFFFFF W', // 14
-    'W PPPP    PP  PP  PP  PPPP  W', // 15 -- plants/decor
-    'WFFFFFFFFFFFFFFFFFFFFFFFFFFF W', // 16
-    'WMMMMMMMMMMMMMMMMMMMMMMMMMM  W', // 17 -- monitors row
-    'WFFFFFFFFFFFFFFFFFFFFFFFFFF  W', // 18
-    'WWWWWWWWWWWWWWWWWWWWWWWWWWWW', // 19
-  ];
+// Wall helper
+function wall(x, y, z, w, h, d, color, opts) {
+  addBox(building, w, h, d, x, y + h/2, z, color, opts);
+}
 
-  // Build proper tile grid
-  const tiles = [];
-  for (let row = 0; row < MAP_H; row++) {
-    tiles[row] = [];
-    for (let col = 0; col < MAP_W; col++) {
-      const ch = (MAP_RAW[row] || '')[col] || ' ';
-      let t = T.FLOOR;
-      switch (ch) {
-        case 'W': t = T.WALL;     break;
-        case 'C': t = T.COUNTER;  break;
-        case 'D': t = T.DESK;     break;
-        case 'T': t = T.TERMINAL; break;
-        case 'A': t = T.ATM;      break;
-        case 'P': t = T.PLANT;    break;
-        case 'M': t = T.MONITOR;  break;
-        case 'S': t = T.SERVER;   break;
-        default:  t = T.FLOOR;    break;
-      }
-      tiles[row][col] = t;
-    }
-  }
+// ── A. Ground floor + atrium ─────────────────────────────────────────────────
+floor(0, 0, 50, 40, -0.1, C.floor);
+floor(0, 0, 48, 38,  0.0, C.carpet);
 
-  // Solid tile types
-  const SOLID = new Set([T.WALL, T.DESK, T.COUNTER, T.SERVER, T.PLANT, T.ATM, T.RACK]);
+// Perimeter walls
+wall(-24.5, 0, 0, 1, 8, 40, C.wall);
+wall( 24.5, 0, 0, 1, 8, 40, C.wall);
+wall(0, 0, -19.5, 50, 8, 1, C.wall);
+wall(0, 0,  19.5, 50, 8, 1, C.wall);
 
-  function tileAt(col, row) {
-    if (row < 0 || row >= MAP_H || col < 0 || col >= MAP_W) return T.WALL;
-    return tiles[row][col];
-  }
+// Glass walls (transparent panels)
+for (let x = -20; x <= 20; x += 4) {
+  addBox(building, 3.6, 6, 0.2, x, 3, -19.3, C.glassLit,
+    { transparent: true, opacity: 0.35, metalness: 0.8, roughness: 0.1, emissive: C.neonBlue, emissiveIntensity: 0.08 });
+  addBox(building, 3.6, 6, 0.2, x, 3,  19.3, C.glassLit,
+    { transparent: true, opacity: 0.35, metalness: 0.8, roughness: 0.1, emissive: C.neonBlue, emissiveIntensity: 0.08 });
+}
 
-  function isSolid(col, row) {
-    return SOLID.has(tileAt(col, row));
-  }
+// ── Central atrium floor strip ───────────────────────────────────────────────
+floor(0, 0, 12, 12, 0.05, 0x1a0a2a);
+// Illuminated floor strips
+for (let i = -5; i <= 5; i += 2) {
+  addBox(building, 10, 0.08, 0.4, 0, 0.1, i, C.neonBlue,
+    { emissive: C.neonBlue, emissiveIntensity: 0.9 });
+  addBox(building, 0.4, 0.08, 10, i, 0.1, 0, C.purple,
+    { emissive: C.purple, emissiveIntensity: 0.6 });
+}
 
-  // ─── Interactive objects ─────────────────────────────────────────────────────
-  const INTERACTABLES = [
-    {
-      id: 'alert_beacon',
-      col: 12, row: 12,
-      label: '[E] Inspect Alert',
-      icon: '🚨',
-      action: 'inspect_alert',
-      available: () => incidentState === 'detected',
-    },
-    {
-      id: 'terminal_a',
-      col: 6, row: 12,
-      label: '[E] Check Terminal',
-      icon: '💻',
-      action: 'check_terminal',
-      available: () => incidentState === 'investigating' && !evidenceCollected.includes('terminal_logs'),
-    },
-    {
-      id: 'terminal_b',
-      col: 20, row: 12,
-      label: '[E] Check Network Switch',
-      icon: '🔌',
-      action: 'check_network',
-      available: () => incidentState === 'investigating' && !evidenceCollected.includes('network_trace'),
-    },
-    {
-      id: 'monitor_wall',
-      col: 4, row: 17,
-      label: '[E] View Monitoring Dashboard',
-      icon: '📊',
-      action: 'check_dashboard',
-      available: () => incidentState === 'investigating',
-    },
-    {
-      id: 'atm',
-      col: 12, row: 13,
-      label: '[E] Test ATM Service',
-      icon: '🏧',
-      action: 'test_atm',
-      available: () => incidentState === 'validating',
-    },
-    {
-      id: 'npc_sre',
-      col: 21, row: 5,
-      label: '[E] Talk to SRE',
-      icon: '👤',
-      action: 'talk_sre',
-      available: () => true,
-    },
-  ];
+// NatWest cube installation (centrepiece)
+const cubeInstall = new THREE.Group();
+const cubeSize = 2.4;
+const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+const cubeMat = new THREE.MeshStandardMaterial({
+  color: 0x2a0a40, emissive: new THREE.Color(0x36C5F0),
+  emissiveIntensity: 0.5, transparent: true, opacity: 0.8,
+  metalness: 0.6, roughness: 0.2,
+});
+const cubeMesh = new THREE.Mesh(cubeGeo, cubeMat);
+cubeInstall.add(cubeMesh);
+// NatWest logo — red chevron bars
+for (let i = 0; i < 3; i++) {
+  const bar = box(0.3, 0.15, 2.42, 0xE01E5A, { emissive: 0xE01E5A, emissiveIntensity: 1 });
+  bar.position.set(-0.4 + i * 0.4, -0.2 + i * 0.2, 0);
+  cubeInstall.add(bar);
+}
+cubeInstall.position.set(0, 1.5, 0);
+building.add(cubeInstall);
 
-  // Diagnosis options (shown when evidence is complete)
-  const DIAGNOSES = [
-    { id: 'db_lock',   label: 'Database connection pool exhausted',      correct: true  },
-    { id: 'net_fault', label: 'Network switch misconfiguration',          correct: false },
-    { id: 'deploy',    label: 'Bad deployment from last release',         correct: false },
-  ];
+// ── Second floor (mezzanine) ─────────────────────────────────────────────────
+// Mezzanine walkway around atrium
+const mezH = 4.5;
+floor(-16, 0, 14, 38, mezH, C.floor2);
+floor( 16, 0, 14, 38, mezH, C.floor2);
+floor(0, -14, 50, 10, mezH, C.floor2);
+floor(0,  14, 50, 10, mezH, C.floor2);
 
-  // Remediation options
-  const REMEDIATIONS = [
-    { id: 'restart_pool', label: 'Restart connection pool service',  correct: true  },
-    { id: 'rollback',     label: 'Roll back last deployment',         correct: false },
-    { id: 'reboot_switch','label': 'Reboot network switch',           correct: false },
-  ];
+// Railings along mezzanine
+function railing(x, z, w, d) {
+  addBox(building, w, 0.1, d, x, mezH + 0.8, z, C.neonBlue,
+    { emissive: C.neonBlue, emissiveIntensity: 0.7 });
+  addBox(building, w, 0.8, d, x, mezH + 0.4, z, C.railing,
+    { transparent: true, opacity: 0.6, metalness: 0.5, roughness: 0.3 });
+}
+railing(-9.5, 0, 0.1, 36);
+railing( 9.5, 0, 0.1, 36);
+railing(0, -9.5, 48, 0.1);
+railing(0,  9.5, 48, 0.1);
 
-  // ─── Dialog sequences ────────────────────────────────────────────────────────
-  const DIALOGS = {
-    inspect_alert: [
-      { who: 'ALERT BEACON — SEV-1', text: 'INCIDENT-0042 | BRANCH SERVICES | CRITICAL\nCustomer logins failing. ATM transactions timing out. Service health: 23%.\nFirst reported: 09:04 UTC.' },
-      { who: 'ALERT BEACON', text: 'Begin investigation. Collect evidence from terminals and monitoring systems before diagnosing.', action: () => { incidentState = 'investigating'; addScore(100, 'Incident detected'); showEvidence(true); } },
-    ],
-    check_terminal: [
-      { who: 'TERMINAL LOG — BRANCH-AUTH-01', text: 'ERROR 09:04:12  Connection pool timeout after 30000ms\nERROR 09:04:13  DB_POOL: max connections (50/50) reached\nWARN  09:04:14  Queue length: 847 pending requests\nERROR 09:04:15  auth-service: upstream unavailable' },
-      { who: 'TERMINAL LOG', text: 'Evidence collected: DB connection pool saturation. Add this to your investigation.', action: () => { collectEvidence('terminal_logs', 'Terminal: DB connection pool saturated (50/50)'); } },
-    ],
-    check_network: [
-      { who: 'NETWORK TRACE — SW-BRANCH-01', text: 'Uplink: OK  |  LAN segments: OK  |  Packet loss: 0.0%\nAll VLANs nominal. No hardware faults detected.\nLast config change: 14 days ago (no recent changes).' },
-      { who: 'NETWORK TRACE', text: 'Evidence collected: Network infrastructure is healthy. Not the root cause.', action: () => { collectEvidence('network_trace', 'Network: All switches healthy — ruled out'); } },
-    ],
-    check_dashboard: [
-      { who: 'MONITORING DASHBOARD', text: 'auth-service   ████░░░░  ERROR RATE 78%  ↑ spike at 09:03\ndb-primary     ████████  CPU 94%         ↑ spike at 09:02\ndb-replica     ████████  connections MAX  ↑ since 09:01\nbranch-api     ████░░░░  latency 12400ms  ↑' },
-      { who: 'MONITORING DASHBOARD', text: 'Evidence collected: DB CPU and connections spiking. auth-service cascading. Looks like a DB-layer issue.', action: () => { collectEvidence('dashboard', 'Dashboard: DB saturated, auth-service cascade'); checkDiagnosisReady(); } },
-    ],
-    talk_sre: [
-      { who: 'ALEX — SITE RELIABILITY ENGINEER', text: '"Hey — we\'ve had this before. When the daily batch report job kicks in at 09:00 it can starve the connection pool if the pool size isn\'t tuned right. Worth checking the DB logs."' },
-      { who: 'ALEX', text: '"Gather your evidence and then make your diagnosis at the monitoring console. You need at least two pieces of evidence before you can diagnose."' },
-    ],
-    test_atm: [
-      { who: 'ATM — VALIDATION', text: 'Running ATM transaction test...\n✓ Connection established\n✓ Auth response: 200ms\n✓ Transaction processed: OK\n✓ Receipt printed: OK', action: () => { addScore(200, 'Validation complete'); finalise(); } },
-    ],
-  };
+// Stairs (two sets)
+for (let i = 0; i < 9; i++) {
+  addBox(building, 3, 0.3, 1, -21, (i * 0.5) + 0.25, -14 + i, 0x2a2040);
+  addBox(building, 3, 0.3, 1,  21, (i * 0.5) + 0.25,  14 - i, 0x2a2040);
+}
 
-  function checkDiagnosisReady() {
-    if (evidenceCollected.length >= 2 && incidentState === 'investigating') {
-      showToast('+250 — Root cause evidence sufficient! Visit the monitoring console to diagnose.', '#ECB22E');
-      // Add a diagnosis interactable at monitor
-      INTERACTABLES.push({
-        id: 'diagnose',
-        col: 14, row: 17,
-        label: '[E] Diagnose — Select Root Cause',
-        icon: '🔍',
-        action: 'diagnose',
-        available: () => incidentState === 'investigating',
-      });
-    }
-  }
+// ── C. Operations Centre (top-right mezzanine, z=-14, x=+) ─────────────────
+function makeZoneLabel(text, x, y, z, color = 0xffffff) {
+  const canvas2 = document.createElement('canvas');
+  canvas2.width = 256; canvas2.height = 64;
+  const c = canvas2.getContext('2d');
+  c.fillStyle = 'rgba(9,8,23,0.85)';
+  c.fillRect(0, 0, 256, 64);
+  c.strokeStyle = '#' + color.toString(16).padStart(6, '0');
+  c.lineWidth = 2;
+  c.strokeRect(1, 1, 254, 62);
+  c.fillStyle = '#' + color.toString(16).padStart(6, '0');
+  c.font = 'bold 18px Courier New';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(text, 128, 32);
+  const tex = new THREE.CanvasTexture(canvas2);
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(4, 1),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })
+  );
+  plane.position.set(x, y, z);
+  scene.add(plane);
+  return plane;
+}
 
-  const DIALOGS_DIAGNOSE = {
-    diagnose: null, // handled specially
-  };
+makeZoneLabel('OPERATIONS CENTRE', 16, mezH + 1.5, -15, 0x36C5F0);
+makeZoneLabel('TRADING FLOOR',    -16, mezH + 1.5, -15, 0xECB22E);
+makeZoneLabel('SECURITY',         -16, mezH + 1.5,  15, 0xE01E5A);
+makeZoneLabel('CUSTOMER SERVICES', 16, mezH + 1.5,  15, 0x2EB67D);
+makeZoneLabel('DATA CENTRE',       -8, 1.5,          -16, 0x36C5F0);
+makeZoneLabel('CLOUD & INFRASTRUCTURE', 8, 1.5,      16, 0x36C5F0);
+makeZoneLabel('PAYMENTS',          16, 1.5,           0, 0xE01E5A);
 
-  // ─── UI helpers ─────────────────────────────────────────────────────────────
-  const $timer   = document.getElementById('timer-val');
-  const $score   = document.getElementById('score-val');
-  const $fill    = document.getElementById('health-fill');
-  const $hpct    = document.getElementById('health-pct');
-  const $incText = document.getElementById('incident-text');
-  const $hint    = document.getElementById('hint-btn');
-  const $dialog  = document.getElementById('dialog');
-  const $dlgWho  = document.getElementById('dialog-who');
-  const $dlgTxt  = document.getElementById('dialog-text');
-  const $evPanel = document.getElementById('evidence-panel');
-  const $evList  = document.getElementById('evidence-list');
-  const $toast   = document.getElementById('toast');
-  const $prompt  = document.getElementById('interact-prompt');
-
-  function fmtTime(s) {
-    const m = Math.floor(s / 60);
-    const ss = String(Math.floor(s % 60)).padStart(2, '0');
-    return `${m}:${ss}`;
-  }
-
-  function updateHUD() {
-    $timer.textContent = fmtTime(timeLeft);
-    $timer.style.color = timeLeft < 60 ? PAL.red : PAL.amber;
-    $score.textContent = score.toLocaleString();
-
-    const hPct = Math.max(0, health);
-    $fill.style.width = hPct + '%';
-    $fill.style.background = hPct > 60 ? PAL.green : hPct > 30 ? PAL.amber : PAL.red;
-    $hpct.textContent = hPct + '%';
-    $hpct.style.color = $fill.style.background;
-
-    const stateLabels = {
-      detected:     'DETECTED — Inspect the alert beacon',
-      investigating:'INVESTIGATING — Gather evidence',
-      diagnosed:    'DIAGNOSED — Apply remediation',
-      remediating:  'REMEDIATING — Fix in progress',
-      validating:   'VALIDATING — Test the service',
-      resolved:     'RESOLVED — Mission complete!',
-    };
-    $incText.textContent = stateLabels[incidentState] || incidentState;
-  }
-
-  let toastTimer = null;
-  function showToast(msg, bg = PAL.green) {
-    $toast.textContent = msg;
-    $toast.style.background = bg;
-    $toast.style.color = bg === PAL.amber ? '#090817' : '#fff';
-    $toast.style.display = 'block';
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { $toast.style.display = 'none'; }, 3000);
-  }
-
-  function showEvidence(show) {
-    $evPanel.style.display = show ? 'block' : 'none';
-  }
-
-  function collectEvidence(id, label) {
-    if (evidenceCollected.includes(id)) return;
-    evidenceCollected.push(id);
-    const div = document.createElement('div');
-    div.className = 'ev-item';
-    div.textContent = '✓ ' + label;
-    $evList.appendChild(div);
-    addScore(50, 'Evidence collected');
-    showToast('+50 — Evidence: ' + label.split(':')[0], PAL.amber);
-  }
-
-  function addScore(pts, reason) {
-    score += pts;
-    if (pts > 0) showToast(`+${pts} — ${reason}`, pts >= 500 ? PAL.green : PAL.blue);
-  }
-
-  // ─── Dialog system ──────────────────────────────────────────────────────────
-  let currentDialogIdx = 0;
-  let currentDialogSeq = null;
-
-  function openDialog(seq) {
-    currentDialogSeq = seq;
-    currentDialogIdx = 0;
-    advanceDialog();
-    state = 'dialog';
-  }
-
-  function advanceDialog() {
-    if (!currentDialogSeq || currentDialogIdx >= currentDialogSeq.length) {
-      $dialog.style.display = 'none';
-      state = 'playing';
-      currentDialogSeq = null;
-      return;
-    }
-    const d = currentDialogSeq[currentDialogIdx];
-    $dlgWho.textContent = d.who;
-    $dlgTxt.textContent = d.text;
-    $dialog.style.display = 'block';
-    if (d.action) d.action();
-    currentDialogIdx++;
-  }
-
-  // ─── Interaction ─────────────────────────────────────────────────────────────
-  function doInteract() {
-    if (state === 'dialog') { advanceDialog(); return; }
-    if (state !== 'playing') return;
-
-    if (interactTarget) {
-      const obj = interactTarget;
-
-      if (obj.action === 'diagnose') {
-        openDiagnoseMenu();
-        return;
-      }
-
-      const seq = DIALOGS[obj.action];
-      if (seq) openDialog(seq);
-    }
-  }
-
-  function openDiagnoseMenu() {
-    // Simple overlay-style prompt using confirm dialogs for prototype simplicity
-    // Build choice text
-    const opts = DIAGNOSES.map((d, i) => `${i + 1}. ${d.label}`).join('\n');
-    const choice = prompt(`DIAGNOSE — Select root cause:\n${opts}\n\nEnter 1, 2 or 3:`);
-    const idx = parseInt(choice, 10) - 1;
-    if (idx < 0 || idx >= DIAGNOSES.length) return;
-
-    const selected = DIAGNOSES[idx];
-    if (selected.correct) {
-      incidentState = 'diagnosed';
-      addScore(250, 'Correct root cause diagnosis!');
-      showToast('+250 — Correct! DB connection pool exhausted.', PAL.green);
-      openRemediationMenu();
-    } else {
-      health = Math.max(0, health - 15);
-      score = Math.max(0, score - 100);
-      showToast('-100 — Wrong diagnosis. Re-examine the evidence.', PAL.red);
-    }
-    updateHUD();
-  }
-
-  function openRemediationMenu() {
-    setTimeout(() => {
-      const opts = REMEDIATIONS.map((r, i) => `${i + 1}. ${r.label}`).join('\n');
-      const choice = prompt(`REMEDIATE — Select fix:\n${opts}\n\nEnter 1, 2 or 3:`);
-      const idx = parseInt(choice, 10) - 1;
-      if (idx < 0 || idx >= REMEDIATIONS.length) return;
-
-      const selected = REMEDIATIONS[idx];
-      if (selected.correct) {
-        incidentState = 'remediating';
-        addScore(500, 'Correct remediation applied!');
-        showToast('+500 — Fix applied! Validating recovery...', PAL.green);
-        setTimeout(() => {
-          incidentState = 'validating';
-          health = Math.min(100, health + 30);
-          showToast('Connection pool restarted. Test the ATM to validate.', PAL.blue);
-          updateHUD();
-        }, 2000);
-      } else {
-        health = Math.max(0, health - 20);
-        score = Math.max(0, score - 100);
-        incidentState = 'investigating';
-        showToast('-100 — Wrong fix. Service still down. Reconsider.', PAL.red);
-      }
-      updateHUD();
-    }, 100);
-  }
-
-  function finalise() {
-    incidentState = 'resolved';
-    timerRunning = false;
-    health = Math.min(100, health + 20);
-
-    // Time bonus
-    if (timeLeft > 180) addScore(100, 'Fast resolution bonus');
-
-    // Publish summary points
-    addScore(150, 'Incident summary published');
-
-    setTimeout(() => {
-      state = 'end';
-      showEndScreen();
-    }, 1500);
-  }
-
-  function showEndScreen() {
-    const overlay = document.getElementById('end-overlay');
-    const grade   = document.getElementById('end-grade');
-    const title   = document.getElementById('end-title');
-    const summary = document.getElementById('end-summary');
-    const scoreEl = document.getElementById('end-score');
-
-    let g, t, s;
-    if (score >= 1500 && timeLeft > 120) {
-      g = 'S'; t = 'SEV-1 CHAMPION'; s = 'Fast, accurate, minimal impact. The bank thanks you.';
-    } else if (score >= 1000) {
-      g = 'A'; t = 'INCIDENT HERO'; s = 'Strong diagnosis and recovery. Well handled.';
-    } else if (score >= 600) {
-      g = 'B'; t = 'RELIABLE RESPONDER'; s = 'Service restored with some wasted time. Good effort.';
-    } else {
-      g = 'C'; t = 'RECOVERY REQUIRED'; s = 'Service restored, but key steps were missed.';
-    }
-
-    grade.textContent = g;
-    title.textContent = t;
-    summary.textContent = s;
-    scoreEl.textContent = `Final score: ${score.toLocaleString()}`;
-    grade.style.color = g === 'S' ? PAL.amber : g === 'A' ? PAL.green : g === 'B' ? PAL.blue : PAL.grey;
-    overlay.style.display = 'flex';
-  }
-
-  // ─── Hint system ─────────────────────────────────────────────────────────────
-  const HINTS = {
-    detected:     'Find the red alert beacon near the ATMs and press E to inspect it.',
-    investigating:'You need 2+ pieces of evidence. Check terminals and the monitoring dashboard.',
-    diagnosed:    'Use the monitoring console to diagnose and select a remediation.',
-    remediating:  'Fix is being applied. Wait for validation prompt.',
-    validating:   'Test the ATM to confirm the service is recovering.',
-    resolved:     'Mission complete! Well done.',
-  };
-
-  function showHint() {
-    if (hintCooldown > 0) {
-      showToast('Hint on cooldown. Wait ' + Math.ceil(hintCooldown) + 's.', PAL.amber);
-      return;
-    }
-    const hint = HINTS[incidentState] || 'Explore the branch and look for interactable objects.';
-    openDialog([{ who: 'AI ASSISTANT', text: hint }]);
-    hintCooldown = 20;
-  }
-
-  // ─── Collision ───────────────────────────────────────────────────────────────
-  function rectOverlapsTile(px, py, pw, ph) {
-    const x0 = Math.floor(px / TILE);
-    const y0 = Math.floor(py / TILE);
-    const x1 = Math.floor((px + pw - 1) / TILE);
-    const y1 = Math.floor((py + ph - 1) / TILE);
-    for (let row = y0; row <= y1; row++) {
-      for (let col = x0; col <= x1; col++) {
-        if (isSolid(col, row)) return true;
-      }
-    }
-    return false;
-  }
-
-  // ─── Rendering ───────────────────────────────────────────────────────────────
-  // Tile draw lookup
-  function drawTile(col, row, t, x, y) {
-    switch (t) {
-      case T.FLOOR:
-        ctx.fillStyle = (col + row) % 2 === 0 ? PAL.floor : PAL.floor2;
-        ctx.fillRect(x, y, TILE, TILE);
-        break;
-      case T.CARPET:
-        ctx.fillStyle = PAL.carpet;
-        ctx.fillRect(x, y, TILE, TILE);
-        break;
-      case T.WALL:
-        ctx.fillStyle = PAL.wall;
-        ctx.fillRect(x, y, TILE, TILE);
-        // top edge highlight
-        ctx.fillStyle = PAL.wallLit;
-        ctx.fillRect(x, y, TILE, 3);
-        break;
-      case T.COUNTER:
-        ctx.fillStyle = PAL.counter;
-        ctx.fillRect(x, y, TILE, TILE);
-        ctx.fillStyle = '#4a2860';
-        ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
-        break;
-      case T.DESK:
-        ctx.fillStyle = PAL.desk;
-        ctx.fillRect(x, y, TILE, TILE);
-        ctx.fillStyle = '#3a2a0e';
-        ctx.fillRect(x + 3, y + 3, TILE - 6, TILE - 6);
-        break;
-      case T.TERMINAL: {
-        ctx.fillStyle = PAL.floor;
-        ctx.fillRect(x, y, TILE, TILE);
-        // Monitor body
-        ctx.fillStyle = '#223344';
-        ctx.fillRect(x + 4, y + 4, TILE - 8, TILE - 10);
-        ctx.fillStyle = PAL.neonBlue;
-        ctx.fillRect(x + 6, y + 6, TILE - 12, TILE - 14);
-        // screen glow
-        ctx.fillStyle = 'rgba(0,229,255,0.15)';
-        ctx.fillRect(x, y, TILE, TILE);
-        break;
-      }
-      case T.ATM: {
-        ctx.fillStyle = PAL.floor;
-        ctx.fillRect(x, y, TILE, TILE);
-        ctx.fillStyle = '#1a3a5a';
-        ctx.fillRect(x + 3, y + 2, TILE - 6, TILE - 4);
-        ctx.fillStyle = PAL.neonGreen;
-        ctx.fillRect(x + 6, y + 5, TILE - 12, 12);
-        ctx.fillStyle = '#36C5F0';
-        ctx.fillRect(x + 8, y + 20, TILE - 16, 6);
-        break;
-      }
-      case T.PLANT: {
-        ctx.fillStyle = PAL.floor;
-        ctx.fillRect(x, y, TILE, TILE);
-        ctx.fillStyle = '#0a200a';
-        ctx.fillRect(x + 8, y + 18, 16, 12);
-        ctx.fillStyle = PAL.plant;
-        ctx.beginPath();
-        ctx.arc(x + TILE/2, y + 14, 10, 0, Math.PI*2);
-        ctx.fill();
-        ctx.fillStyle = '#2a5a2a';
-        ctx.beginPath();
-        ctx.arc(x + TILE/2 - 5, y + 10, 7, 0, Math.PI*2);
-        ctx.fill();
-        break;
-      }
-      case T.MONITOR: {
-        ctx.fillStyle = PAL.floor;
-        ctx.fillRect(x, y, TILE, TILE);
-        ctx.fillStyle = '#001122';
-        ctx.fillRect(x + 2, y + 4, TILE - 4, TILE - 8);
-        // Draw tiny chart
-        ctx.fillStyle = PAL.neonGreen;
-        for (let i = 0; i < 5; i++) {
-          const h2 = 3 + Math.sin(i * 1.5 + Date.now() * 0.001) * 3;
-          ctx.fillRect(x + 5 + i * 5, y + TILE - 10 - h2, 3, h2);
-        }
-        break;
-      }
-      case T.SERVER:
-      case T.RACK: {
-        ctx.fillStyle = PAL.serverRack;
-        ctx.fillRect(x, y, TILE, TILE);
-        ctx.fillStyle = '#002244';
-        ctx.fillRect(x + 4, y + 2, TILE - 8, 5);
-        ctx.fillRect(x + 4, y + 9, TILE - 8, 5);
-        ctx.fillRect(x + 4, y + 16, TILE - 8, 5);
-        ctx.fillStyle = PAL.neonGreen;
-        ctx.fillRect(x + TILE - 8, y + 3, 3, 3);
-        ctx.fillRect(x + TILE - 8, y + 10, 3, 3);
-        ctx.fillStyle = PAL.amber;
-        ctx.fillRect(x + TILE - 8, y + 17, 3, 3);
-        break;
-      }
-      case T.DOOR: {
-        ctx.fillStyle = '#2a1840';
-        ctx.fillRect(x, y, TILE, TILE);
-        ctx.fillStyle = PAL.blue;
-        ctx.fillRect(x + 8, y + 4, TILE - 16, TILE - 8);
-        break;
-      }
-      default:
-        ctx.fillStyle = PAL.floor;
-        ctx.fillRect(x, y, TILE, TILE);
-    }
-  }
-
-  // Draw interactive object overlays (glowing icons)
-  function drawInteractables() {
-    const t = Date.now() * 0.003;
-    for (const obj of INTERACTABLES) {
-      if (!obj.available()) continue;
-      const wx = obj.col * TILE - cam.x;
-      const wy = obj.row * TILE - cam.y;
-
-      // Pulsing glow
-      const pulse = 0.5 + 0.5 * Math.sin(t + obj.col);
-      ctx.save();
-      ctx.globalAlpha = 0.2 + 0.2 * pulse;
-      ctx.fillStyle = obj.action === 'inspect_alert' ? PAL.red : PAL.blue;
-      ctx.fillRect(wx - 4, wy - 4, TILE + 8, TILE + 8);
-      ctx.globalAlpha = 1;
-
-      // Icon
-      ctx.font = '18px serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(obj.icon || '❓', wx + TILE/2, wy + TILE/2 + 6);
-      ctx.restore();
-    }
-  }
-
-  // Draw NPC (simple pixel character)
-  function drawNPC(wx, wy, color, label) {
+// ── Zone: Data Centre (ground, x=-8..0, z=-18..-10) ─────────────────────────
+function buildDataCentre() {
+  const g = new THREE.Group();
+  // Server racks
+  for (let i = 0; i < 5; i++) {
+    const rack = new THREE.Group();
     // Body
-    ctx.fillStyle = color;
-    ctx.fillRect(wx + 10, wy + 12, 12, 14);
-    // Head
-    ctx.fillStyle = '#c68642';
-    ctx.fillRect(wx + 11, wy + 4, 10, 10);
-    // Hair
-    ctx.fillStyle = '#3d2314';
-    ctx.fillRect(wx + 11, wy + 4, 10, 4);
-    // Name
-    ctx.fillStyle = PAL.blue;
-    ctx.font = '9px Courier New';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, wx + 16, wy + 30);
+    addBox(rack, 1, 4, 2, 0, 2, 0, C.server, { metalness: 0.7, roughness: 0.3 });
+    addBox(rack, 0.9, 3.8, 0.1, 0, 2, 1.05, 0x0a0a1a);
+    // LED strips per U
+    for (let u = 0; u < 8; u++) {
+      const ledColor = u < 6 ? C.neonGreen : C.neonRed;
+      const led = box(0.5, 0.07, 0.08, ledColor,
+        { emissive: ledColor, emissiveIntensity: 1.2 });
+      led.position.set(0.1, 0.4 + u * 0.45, 1.06);
+      rack.add(led);
+    }
+    rack.position.set(-12 + i * 2.5, 0, -15);
+    g.add(rack);
   }
+  building.add(g);
+  return g;
+}
+buildDataCentre();
 
-  // Draw player
-  function drawPlayer() {
-    const wx = player.x - cam.x;
-    const wy = player.y - cam.y;
-    const f  = Math.floor(player.animFrame);
-
-    // Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath();
-    ctx.ellipse(wx + 10, wy + 21, 8, 3, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    // Body — aubergine jacket
-    ctx.fillStyle = '#5a1a6a';
-    ctx.fillRect(wx + 7, wy + 11, 13, 12);
-
-    // Head
-    ctx.fillStyle = '#c68642';
-    ctx.fillRect(wx + 8, wy + 3, 11, 10);
-
-    // Hair
-    ctx.fillStyle = '#2a1a0a';
-    ctx.fillRect(wx + 8, wy + 3, 11, 4);
-
-    // Eyes
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(wx + 10, wy + 8, 2, 2);
-    ctx.fillRect(wx + 14, wy + 8, 2, 2);
-
-    // Legs (animated)
-    const legOffset = player.moving ? Math.sin(Date.now() * 0.01) * 2 : 0;
-    ctx.fillStyle = '#1a1a3a';
-    ctx.fillRect(wx + 8,  wy + 21 + legOffset,  5, 8);
-    ctx.fillRect(wx + 14, wy + 21 - legOffset, 5, 8);
-
-    // Tablet
-    ctx.fillStyle = '#36C5F0';
-    ctx.fillRect(wx + 18, wy + 13, 5, 7);
-    ctx.fillStyle = '#090817';
-    ctx.fillRect(wx + 19, wy + 14, 3, 5);
+// ── Zone: Cloud & Infra (ground, x=8..20, z=10..18) ─────────────────────────
+function buildCloudInfra() {
+  // Network switches + cloud symbols
+  for (let i = 0; i < 3; i++) {
+    addBox(building, 2, 0.6, 1.2, 12 + i * 3, 0.3, 14, C.serverLit, { metalness: 0.5 });
+    addBox(building, 1.8, 0.08, 1, 12 + i * 3, 0.64, 14, C.neonCyan,
+      { emissive: C.neonCyan, emissiveIntensity: 0.8 });
   }
+  // Cloud symbol (box art)
+  const cloud = new THREE.Group();
+  addBox(cloud, 1.2, 0.8, 0.3, 0, 0, 0, C.neonBlue, { emissive: C.neonBlue, emissiveIntensity: 0.4 });
+  addBox(cloud, 0.7, 0.7, 0.3, -0.3, 0.3, 0, C.neonBlue, { emissive: C.neonBlue, emissiveIntensity: 0.4 });
+  addBox(cloud, 0.7, 0.7, 0.3,  0.3, 0.3, 0, C.neonBlue, { emissive: C.neonBlue, emissiveIntensity: 0.4 });
+  cloud.position.set(16, 2, 14);
+  building.add(cloud);
+}
+buildCloudInfra();
 
-  // ─── Main render loop ─────────────────────────────────────────────────────────
-  function render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+// ── Zone: Payments (ground, x=14..22, z=-5..5) ──────────────────────────────
+function buildPayments() {
+  for (let i = 0; i < 4; i++) {
+    const unit = new THREE.Group();
+    addBox(unit, 1.5, 1.2, 1, 0, 0.6, 0, 0x0a1a2a, { metalness: 0.6 });
+    addBox(unit, 1.3, 0.08, 0.8, 0, 1.24, 0, C.neonAmber, { emissive: C.neonAmber, emissiveIntensity: 0.9 });
+    // Transaction indicator
+    const ind = box(0.3, 0.3, 0.1, i < 2 ? C.neonRed : C.neonGreen,
+      { emissive: i < 2 ? C.neonRed : C.neonGreen, emissiveIntensity: 1 });
+    ind.position.set(0.4, 0.6, 0.51);
+    unit.add(ind);
+    unit.position.set(18, 0, -3 + i * 2);
+    building.add(unit);
+  }
+}
+buildPayments();
 
-    // Background
-    ctx.fillStyle = PAL.bg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+// ── Zone: Operations Centre (mezzanine, x=8..22, z=-18..-10) ────────────────
+function buildOpsCenter() {
+  // Desks
+  for (let i = 0; i < 6; i++) {
+    const desk = new THREE.Group();
+    addBox(desk, 2, 0.1, 1, 0, 0.75, 0, C.deskTop);
+    addBox(desk, 2, 0.7, 1, 0, 0.35, 0, C.desk);
+    addBox(desk, 0.8, 0.5, 0.05, 0, 1.1, 0.4, C.screenOn,
+      { emissive: C.neonBlue, emissiveIntensity: 0.5 });
+    desk.position.set(10 + (i % 3) * 2.5, mezH, -16 + Math.floor(i / 3) * 2.2);
+    building.add(desk);
+  }
+  // Incident console (big monitor wall)
+  addBox(building, 8, 3, 0.3, 16, mezH + 2, -18.7, C.screen,
+    { emissive: C.neonBlue, emissiveIntensity: 0.25 });
+  addBox(building, 7.6, 2.6, 0.1, 16, mezH + 2, -18.55, 0x002244,
+    { emissive: 0x003366, emissiveIntensity: 0.4 });
+}
+buildOpsCenter();
 
-    if (state === 'title' || state === 'end') return;
+// ── Zone: Trading Floor (mezzanine, x=-22..-8, z=-18..-10) ──────────────────
+function buildTradingFloor() {
+  for (let i = 0; i < 8; i++) {
+    const desk = new THREE.Group();
+    addBox(desk, 1.8, 0.1, 1, 0, 0.75, 0, C.deskTop);
+    addBox(desk, 1.8, 0.7, 1, 0, 0.35, 0, C.desk);
+    // Dual screens
+    for (let s = -1; s <= 1; s += 2) {
+      addBox(desk, 0.55, 0.5, 0.05, s * 0.4, 1.1, 0.45, C.screenOn,
+        { emissive: C.neonAmber, emissiveIntensity: 0.4 });
+    }
+    desk.position.set(-18 + (i % 4) * 2.2, mezH, -16 + Math.floor(i / 4) * 2.2);
+    building.add(desk);
+  }
+  // Alert beacon
+  const beacon = new THREE.Group();
+  addBox(beacon, 0.3, 1.2, 0.3, 0, 0.6, 0, 0x221122);
+  const beaconLight = box(0.5, 0.5, 0.5, C.neonRed, { emissive: C.neonRed, emissiveIntensity: 1.5 });
+  beaconLight.position.set(0, 1.45, 0);
+  beacon.add(beaconLight);
+  beacon.position.set(-16, mezH, -16);
+  building.add(beacon);
+  return beacon;
+}
+buildTradingFloor();
 
-    // Camera: center on player
-    cam.x = player.x - canvas.width  / 2 + player.w / 2;
-    cam.y = player.y - canvas.height / 2 + player.h / 2;
-    // Clamp to map
-    cam.x = Math.max(0, Math.min(cam.x, MAP_W * TILE - canvas.width));
-    cam.y = Math.max(0, Math.min(cam.y, MAP_H * TILE - canvas.height));
+// ── Zone: Security (mezzanine, x=-22..-8, z=10..18) ─────────────────────────
+function buildSecurity() {
+  // Security consoles
+  for (let i = 0; i < 3; i++) {
+    const con = new THREE.Group();
+    addBox(con, 2, 1, 1.2, 0, 0.5, 0, 0x0a0a1a, { metalness: 0.7 });
+    addBox(con, 1.8, 0.08, 1, 0, 1.04, 0, C.neonRed, { emissive: C.neonRed, emissiveIntensity: 0.7 });
+    addBox(con, 1.4, 0.9, 0.05, 0, 1.5, 0.56, 0x0a0a1a,
+      { emissive: 0x330000, emissiveIntensity: 0.5 });
+    con.position.set(-20 + i * 3, mezH, 16);
+    building.add(con);
+  }
+  // Locked door indicator
+  addBox(building, 2, 3, 0.3, -10, mezH + 1.5, 19.5, 0x1a0000);
+  addBox(building, 0.8, 0.8, 0.1, -10, mezH + 1.5, 19.6, C.neonRed,
+    { emissive: C.neonRed, emissiveIntensity: 1.2 });
+}
+buildSecurity();
 
-    // Draw tiles
-    const startCol = Math.max(0, Math.floor(cam.x / TILE));
-    const endCol   = Math.min(MAP_W, Math.ceil((cam.x + canvas.width)  / TILE) + 1);
-    const startRow = Math.max(0, Math.floor(cam.y / TILE));
-    const endRow   = Math.min(MAP_H, Math.ceil((cam.y + canvas.height) / TILE) + 1);
+// ── Zone: Customer Services (mezzanine, x=8..22, z=10..18) ──────────────────
+function buildCustomerServices() {
+  for (let i = 0; i < 5; i++) {
+    const desk = new THREE.Group();
+    addBox(desk, 2.5, 0.8, 1, 0, 0.4, 0, C.desk);
+    addBox(desk, 2.3, 0.08, 0.8, 0, 0.84, 0, C.deskTop);
+    addBox(desk, 1, 0.7, 0.05, 0.5, 1.2, 0.41, C.screenOn,
+      { emissive: C.neonGreen, emissiveIntensity: 0.4 });
+    desk.position.set(10 + (i % 3) * 2.8, mezH, 14 + Math.floor(i / 3) * 2);
+    building.add(desk);
+  }
+}
+buildCustomerServices();
 
-    for (let row = startRow; row < endRow; row++) {
-      for (let col = startCol; col < endCol; col++) {
-        const wx = col * TILE - cam.x;
-        const wy = row * TILE - cam.y;
-        drawTile(col, row, tiles[row][col], wx, wy);
+// ── Background: City skyline (dusk) ─────────────────────────────────────────
+function buildSkyline() {
+  const skyColors = [0x1a0a3a, 0x0d0820, 0x150d30];
+  const heights   = [30, 22, 18, 25, 14, 20, 28, 16];
+  for (let i = 0; i < heights.length; i++) {
+    const h = heights[i];
+    const bld = box(5, h, 5, skyColors[i % 3], { roughness: 1 });
+    bld.position.set(-35 + i * 10, h / 2 - 4, -40);
+    scene.add(bld);
+    // Windows
+    for (let wy = 0; wy < h; wy += 3) {
+      for (let wx = -1; wx <= 1; wx++) {
+        if (Math.random() > 0.4) {
+          const win = box(0.6, 0.6, 0.1, 0xECB22E,
+            { emissive: 0xECB22E, emissiveIntensity: Math.random() * 0.6 + 0.2 });
+          win.position.set(-35 + i * 10 + wx * 1.5, wy - 2, -37.5);
+          scene.add(win);
+        }
       }
     }
-
-    // Grid lines (subtle)
-    ctx.strokeStyle = 'rgba(63,14,64,0.18)';
-    ctx.lineWidth = 0.5;
-    for (let col = startCol; col <= endCol; col++) {
-      ctx.beginPath();
-      ctx.moveTo(col * TILE - cam.x, 0);
-      ctx.lineTo(col * TILE - cam.x, canvas.height);
-      ctx.stroke();
-    }
-    for (let row = startRow; row <= endRow; row++) {
-      ctx.beginPath();
-      ctx.moveTo(0, row * TILE - cam.y);
-      ctx.lineTo(canvas.width, row * TILE - cam.y);
-      ctx.stroke();
-    }
-
-    drawInteractables();
-
-    // NPC
-    const npcWx = 21 * TILE - cam.x;
-    const npcWy = 5  * TILE - cam.y;
-    drawNPC(npcWx, npcWy, '#36C5F0', 'ALEX');
-
-    drawPlayer();
-
-    // Room label
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.font = 'bold 11px Courier New';
-    ctx.textAlign = 'left';
-    ctx.fillText('LEVEL 1 — BRANCH OPERATIONS', 16, canvas.height - 16);
   }
+  // Sky gradient (large back plane)
+  const skyGeo = new THREE.PlaneGeometry(200, 60);
+  const skyMat = new THREE.MeshBasicMaterial({ color: 0x0a0520 });
+  const sky = new THREE.Mesh(skyGeo, skyMat);
+  sky.position.set(0, 20, -55);
+  scene.add(sky);
+  // Horizon glow
+  const glowGeo = new THREE.PlaneGeometry(200, 12);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xff4400, transparent: true, opacity: 0.12,
+  });
+  const glow = new THREE.Mesh(glowGeo, glowMat);
+  glow.position.set(0, -2, -54);
+  scene.add(glow);
+}
+buildSkyline();
 
-  // ─── Update loop ─────────────────────────────────────────────────────────────
-  function update(dt) {
-    if (state !== 'playing') return;
+// ── Animated elements ────────────────────────────────────────────────────────
+const animatedBeacons = [];
+function addBeacon(x, y, z) {
+  const b = box(0.4, 0.4, 0.4, C.neonRed, { emissive: C.neonRed, emissiveIntensity: 1.5 });
+  b.position.set(x, y, z);
+  building.add(b);
+  animatedBeacons.push(b);
+  return b;
+}
+// Incident alert beacons in various zones
+addBeacon(-8, 1, -15);  // data centre
+addBeacon(18, 2, 0);    // payments
+addBeacon(-16, mezH + 1, -15); // trading floor
 
+// ── NPCs (voxel characters) ──────────────────────────────────────────────────
+function makeNPC(color, x, y, z) {
+  const npc = new THREE.Group();
+  addBox(npc, 0.5, 0.6, 0.4, 0, 0.3, 0, color); // body
+  addBox(npc, 0.45, 0.45, 0.45, 0, 0.95, 0, 0xc68642); // head
+  addBox(npc, 0.2, 0.4, 0.2, -0.38, 0.3, 0, color); // arm L
+  addBox(npc, 0.2, 0.4, 0.2,  0.38, 0.3, 0, color); // arm R
+  addBox(npc, 0.2, 0.5, 0.2, -0.15, -0.25, 0, 0x1a1a3a); // leg L
+  addBox(npc, 0.2, 0.5, 0.2,  0.15, -0.25, 0, 0x1a1a3a); // leg R
+  npc.position.set(x, y + 0.6, z);
+  building.add(npc);
+  return npc;
+}
+// Populate zones with staff
+const npcs = [
+  makeNPC(0x36C5F0, -12, 0, -13),
+  makeNPC(0x2EB67D,  14, mezH, -14),
+  makeNPC(0xECB22E, -14, mezH, -14),
+  makeNPC(0x8833ff,  -8, 0, -12),
+  makeNPC(0x36C5F0,  16, mezH,  14),
+  makeNPC(0xE01E5A, -16, mezH,  14),
+];
+
+// ── Player character ──────────────────────────────────────────────────────────
+const playerGroup = new THREE.Group();
+const playerBody  = addBox(playerGroup, 0.7, 0.85, 0.5, 0, 0.425, 0, 0x5a1a6a, { roughness: 0.6 });
+const playerHead  = addBox(playerGroup, 0.65, 0.65, 0.65, 0, 1.1, 0, 0xc68642);
+addBox(playerGroup, 0.65, 0.25, 0.67, 0, 1.35, 0, 0x2a1a0a); // hair
+// Eyes
+addBox(playerGroup, 0.12, 0.12, 0.05, -0.15, 1.1, 0.34, 0x111122);
+addBox(playerGroup, 0.12, 0.12, 0.05,  0.15, 1.1, 0.34, 0x111122);
+const playerLegL = addBox(playerGroup, 0.28, 0.5, 0.28, -0.2, -0.25, 0, 0x1a1a3a);
+const playerLegR = addBox(playerGroup, 0.28, 0.5, 0.28,  0.2, -0.25, 0, 0x1a1a3a);
+const playerArmL = addBox(playerGroup, 0.22, 0.55, 0.22, -0.5, 0.4, 0, 0x5a1a6a);
+const playerArmR = addBox(playerGroup, 0.22, 0.55, 0.22,  0.5, 0.4, 0, 0x5a1a6a);
+// Tablet
+addBox(playerGroup, 0.35, 0.25, 0.04, 0.62, 0.5, 0.1, 0x36C5F0,
+  { emissive: 0x36C5F0, emissiveIntensity: 0.4 });
+// NatWest logo on back
+addBox(playerGroup, 0.35, 0.25, 0.05, 0, 0.6, -0.28, C.neonRed,
+  { emissive: C.neonRed, emissiveIntensity: 0.6 });
+
+playerGroup.position.set(2, 0.5, 2);
+scene.add(playerGroup);
+
+// ── Game state ────────────────────────────────────────────────────────────────
+let gameState    = 'title';
+let score        = 0;
+let health       = 100;
+let timeLeft     = 300;
+let lastTimestamp = 0;
+let timerRunning = false;
+let incidentsDone = 0;
+const TOTAL_INCIDENTS = 5;
+let evidenceList = [];
+let currentDialogSeq = null;
+let currentDialogIdx = 0;
+let nearestObj = null;
+let hintCooldown = 0;
+
+// ── Objectives / interactables ────────────────────────────────────────────────
+const objectives = [
+  {
+    id: 'beacon_atrium',
+    label: 'E — Inspect SEV-1 Alert',
+    pos: new THREE.Vector3(0, 0.5, 0),
+    radius: 3.5,
+    done: false,
+    available: () => incidentsDone === 0,
+    dialog: [
+      { who: 'SEV-1 ALERT — INCIDENT-0042', text: 'CRITICAL | ALL SERVICES DEGRADED\nCustomer logins failing. Payments timing out.\nBank health: 68% and falling fast.\n\nObjectives assigned:\n1. Data Centre — investigate server fault\n2. Cloud & Infra — restore network link\n3. Payments — recover transaction processing\n4. Ops Centre — confirm service health' },
+      { who: 'AI ASSISTANT', text: 'Investigation started. Check the Data Centre first — the monitoring dashboard shows DB-related errors. Collect evidence at each zone.' },
+    ],
+    onComplete: () => { incidentsDone++; health = Math.min(100, health + 5); addScore(100, 'Alert inspected'); },
+  },
+  {
+    id: 'data_centre',
+    label: 'E — Investigate Server Fault',
+    pos: new THREE.Vector3(-10, 0.5, -15),
+    radius: 4,
+    done: false,
+    available: () => incidentsDone >= 1,
+    dialog: [
+      { who: 'DATA CENTRE — RACK-DB-03', text: 'FAULT DETECTED\nDisk array: DEGRADED (RAID-5 rebuild active)\nI/O wait: 94%  |  Queue depth: 847\nConnection pool: 50/50 SATURATED\nLast healthy snapshot: 08:58 UTC' },
+      { who: 'DATA CENTRE', text: 'Evidence collected: DB I/O saturation causing connection pool exhaustion. The auth and payments services are cascading from this single fault.' },
+    ],
+    onComplete: () => {
+      incidentsDone++;
+      addScore(250 + 50, 'Data Centre investigated + evidence');
+      collectEvidence('db_fault', 'Data Centre: RAID rebuild saturating I/O');
+      // Flash racks green
+      animatedBeacons[0].material.emissive.set(C.neonGreen);
+    },
+  },
+  {
+    id: 'cloud_infra',
+    label: 'E — Restore Network Link',
+    pos: new THREE.Vector3(16, 0.5, 14),
+    radius: 4,
+    done: false,
+    available: () => incidentsDone >= 2,
+    dialog: [
+      { who: 'CLOUD & INFRASTRUCTURE — NET-SW-07', text: 'Network path to DB replica: DEGRADED\nFailover did not trigger — replica unreachable.\nApplying fix: re-enabling replica routing...\n\n✓ Replica connection restored\n✓ Failover path verified\n✓ Connection pool pressure reducing: 44/50' },
+    ],
+    onComplete: () => {
+      incidentsDone++;
+      health = Math.min(100, health + 15);
+      addScore(500, 'Network link restored!');
+      collectEvidence('network_fix', 'Cloud: DB replica routing restored');
+    },
+  },
+  {
+    id: 'payments',
+    label: 'E — Recover Transaction Processing',
+    pos: new THREE.Vector3(18, 0.5, -2),
+    radius: 4,
+    done: false,
+    available: () => incidentsDone >= 3,
+    dialog: [
+      { who: 'PAYMENTS PLATFORM — PAY-API-01', text: 'Transaction queue: draining (847 → 112 pending)\nLatency: 12400ms → 890ms\nError rate: 78% → 4.2%\n\nApplying remediation: circuit-breaker reset + pool expansion...\n\n✓ Circuit breaker reset\n✓ Pool expanded: 50 → 120 connections\n✓ Transaction rate normalising' },
+    ],
+    onComplete: () => {
+      incidentsDone++;
+      health = Math.min(100, health + 20);
+      addScore(500, 'Payments recovered!');
+      animatedBeacons[1].material.emissive.set(C.neonGreen);
+    },
+  },
+  {
+    id: 'ops_centre',
+    label: 'E — Verify Service Restoration',
+    pos: new THREE.Vector3(16, mezH + 0.5, -16),
+    radius: 4,
+    done: false,
+    available: () => incidentsDone >= 4,
+    dialog: [
+      { who: 'OPERATIONS CENTRE — MONITORING', text: 'Running full health check...\n\n✓ auth-service       HEALTHY  p99: 180ms\n✓ db-primary         HEALTHY  I/O: 22%\n✓ db-replica         HEALTHY  connections: 28/120\n✓ payments-api       HEALTHY  error rate: 0.1%\n✓ mobile-app         HEALTHY  apdex: 0.96\n✓ branch-services    HEALTHY  all terminals OK\n\nBank Health: RESTORED' },
+      { who: 'OPERATIONS CENTRE', text: 'SEV-1 RESOLVED. Incident summary published.\nRoot cause: RAID-5 disk rebuild on db-primary caused I/O saturation, exhausting connection pool. Cascaded to auth and payments services.\nPrevention: Increase connection pool limit; enable proactive RAID monitoring alerts.' },
+    ],
+    onComplete: () => {
+      incidentsDone++;
+      health = Math.min(100, health + 20);
+      addScore(150 + 200, 'Service verified + summary published');
+      animatedBeacons[2].material.emissive.set(C.neonGreen);
+      setTimeout(() => endGame(), 2000);
+    },
+  },
+];
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && gameState === 'playing') togglePause();
+  else if ((e.key === 'p' || e.key === 'P' || e.key === 'Escape') && gameState === 'paused') togglePause();
+  if ((e.key === 'e' || e.key === 'E') && (gameState === 'playing' || gameState === 'dialog')) doInteract();
+  if ((e.key === 'h' || e.key === 'H') && gameState === 'playing') showHint();
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// ── Player movement state ─────────────────────────────────────────────────────
+const playerVel   = new THREE.Vector3();
+const PLAYER_SPEED = 5;
+
+// Simplified collision: keep player inside building bounds
+function clampPlayer(pos) {
+  pos.x = Math.max(-22, Math.min(22, pos.x));
+  pos.z = Math.max(-18, Math.min(18, pos.z));
+  // Auto-elevate to mezzanine when over staircase areas
+  if ((pos.x < -20 && pos.z < -12) || (pos.x < -20 && pos.z > 12) ||
+      (pos.x >  20 && pos.z < -12) || (pos.x >  20 && pos.z > 12)) {
+    pos.y = Math.max(0.5, Math.min(5, pos.y));
+  } else if (Math.abs(pos.x) > 10 && Math.abs(pos.z) > 10) {
+    pos.y = mezH + 0.5;
+  } else {
+    pos.y = 0.5;
+  }
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+const $timer    = document.getElementById('timer-val');
+const $fill     = document.getElementById('health-fill');
+const $hpct     = document.getElementById('health-pct');
+const $incidents= document.getElementById('incidents-val');
+const $dialog   = document.getElementById('dialog');
+const $dlgWho   = document.getElementById('dialog-who');
+const $dlgTxt   = document.getElementById('dialog-text');
+const $toast    = document.getElementById('toast');
+const $prompt   = document.getElementById('interact-prompt');
+const $evPanel  = document.getElementById('evidence-panel');
+const $evList   = document.getElementById('evidence-list');
+
+function fmtTime(s) {
+  const m  = Math.floor(s / 60);
+  const ss = String(Math.floor(s % 60)).padStart(2, '0');
+  return `${m}:${ss}`;
+}
+
+function updateHUD() {
+  $timer.textContent = fmtTime(timeLeft);
+  $timer.style.color = timeLeft < 60 ? '#E01E5A' : '#ECB22E';
+
+  const hp = Math.max(0, Math.round(health));
+  $fill.style.width  = hp + '%';
+  $fill.style.background = hp > 60 ? '#2EB67D' : hp > 30 ? '#ECB22E' : '#E01E5A';
+  $hpct.textContent  = hp + '%';
+  $hpct.style.color  = $fill.style.background;
+
+  $incidents.innerHTML = `${incidentsDone} / ${TOTAL_INCIDENTS} <span style="font-size:11px;color:#E01E5A">RESOLVED</span>`;
+}
+
+let toastTmr = null;
+function showToast(msg, bg = '#2EB67D') {
+  $toast.textContent  = msg;
+  $toast.style.background = bg;
+  $toast.style.color  = bg === '#ECB22E' ? '#090817' : '#fff';
+  $toast.style.display = 'block';
+  if (toastTmr) clearTimeout(toastTmr);
+  toastTmr = setTimeout(() => { $toast.style.display = 'none'; }, 3000);
+}
+
+function addScore(pts, reason) {
+  score += pts;
+  showToast(`+${pts} — ${reason}`, pts >= 500 ? '#2EB67D' : '#36C5F0');
+}
+
+function collectEvidence(id, label) {
+  if (evidenceList.includes(id)) return;
+  evidenceList.push(id);
+  const div = document.createElement('div');
+  div.className = 'ev-item';
+  div.textContent = '✓ ' + label;
+  $evList.appendChild(div);
+  $evPanel.style.display = 'block';
+}
+
+// ── Dialog system ─────────────────────────────────────────────────────────────
+function openDialog(seq, onEnd) {
+  currentDialogSeq = seq;
+  currentDialogIdx = 0;
+  currentDialogOnEnd = onEnd || null;
+  advanceDialog();
+  gameState = 'dialog';
+}
+let currentDialogOnEnd = null;
+
+function advanceDialog() {
+  if (!currentDialogSeq || currentDialogIdx >= currentDialogSeq.length) {
+    $dialog.style.display = 'none';
+    gameState = 'playing';
+    if (currentDialogOnEnd) { currentDialogOnEnd(); currentDialogOnEnd = null; }
+    currentDialogSeq = null;
+    return;
+  }
+  const d = currentDialogSeq[currentDialogIdx++];
+  $dlgWho.textContent = d.who;
+  $dlgTxt.textContent = d.text;
+  $dialog.style.display = 'block';
+}
+
+function doInteract() {
+  if (gameState === 'dialog') { advanceDialog(); return; }
+  if (gameState !== 'playing') return;
+  if (!nearestObj) return;
+
+  const obj = objectives.find(o => o.id === nearestObj);
+  if (!obj || obj.done || !obj.available()) return;
+
+  obj.done = true;
+  openDialog(obj.dialog, obj.onComplete);
+}
+
+// ── Hint ─────────────────────────────────────────────────────────────────────
+const HINTS = [
+  'Find the glowing red alert beacon in the central atrium and press E.',
+  'Head to the Data Centre (bottom-left) — look for the glowing server racks.',
+  'Cloud & Infrastructure is in the lower-right zone. Restore the network link.',
+  'Payments zone is on the right side. Recover the transaction processing unit.',
+  'Take the stairs to the mezzanine and find the Operations Centre to verify recovery.',
+];
+function showHint() {
+  if (hintCooldown > 0) { showToast(`Hint cooldown: ${Math.ceil(hintCooldown)}s`, '#ECB22E'); return; }
+  const hint = HINTS[Math.min(incidentsDone, HINTS.length - 1)];
+  openDialog([{ who: 'AI ASSISTANT', text: hint }]);
+  hintCooldown = 20;
+}
+
+// ── Pause / end ───────────────────────────────────────────────────────────────
+function togglePause() {
+  if (gameState === 'playing') {
+    gameState = 'paused';
+    timerRunning = false;
+    document.getElementById('pause-overlay').style.display = 'flex';
+  } else if (gameState === 'paused') {
+    gameState = 'playing';
+    timerRunning = true;
+    document.getElementById('pause-overlay').style.display = 'none';
+  }
+}
+
+function endGame() {
+  timerRunning = false;
+  gameState    = 'end';
+  let g, t, s;
+  if (score >= 1700 && timeLeft > 120) {
+    g = 'S'; t = 'SEV-1 CHAMPION';    s = 'Perfect run. The bank is back online and customers never noticed.';
+  } else if (score >= 1100) {
+    g = 'A'; t = 'INCIDENT HERO';     s = 'All services restored with strong diagnosis. Well handled.';
+  } else if (score >= 700) {
+    g = 'B'; t = 'RELIABLE RESPONDER';s = 'Service recovered with some delay. Good effort.';
+  } else {
+    g = 'C'; t = 'RECOVERY REQUIRED'; s = 'Services restored, but key steps were missed or slow.';
+  }
+  const gradeColors = { S: '#ECB22E', A: '#2EB67D', B: '#36C5F0', C: '#888' };
+  document.getElementById('end-grade').textContent = g;
+  document.getElementById('end-grade').style.color = gradeColors[g];
+  document.getElementById('end-title').textContent = t;
+  document.getElementById('end-summary').textContent = s;
+  document.getElementById('end-score').textContent = `Final score: ${score.toLocaleString()}`;
+  document.getElementById('end-overlay').style.display = 'flex';
+}
+
+// ── Start / restart ───────────────────────────────────────────────────────────
+function startGame() {
+  score = 0; health = 100; timeLeft = 300;
+  incidentsDone = 0; evidenceList = [];
+  hintCooldown = 0;
+  objectives.forEach(o => {
+    o.done = false;
+    if (o.id === 'data_centre' || o.id === 'payments') {
+      animatedBeacons[objectives.indexOf(o)]?.material.emissive.set(C.neonRed);
+    }
+  });
+  animatedBeacons.forEach(b => b.material.emissive.set(C.neonRed));
+  $evList.innerHTML = '';
+  $evPanel.style.display = 'none';
+  $dialog.style.display = 'none';
+  $toast.style.display = 'none';
+  playerGroup.position.set(2, 0.5, 2);
+  document.getElementById('title-overlay').style.display = 'none';
+  document.getElementById('end-overlay').style.display = 'none';
+  document.getElementById('pause-overlay').style.display = 'none';
+  document.getElementById('minimap').style.display = 'block';
+  timerRunning = true;
+  gameState = 'playing';
+  updateHUD();
+}
+
+// ── Minimap ───────────────────────────────────────────────────────────────────
+const minimapCtx = document.getElementById('minimap-canvas').getContext('2d');
+function drawMinimap() {
+  const mw = 140, mh = 90;
+  const scaleX = mw / 50, scaleZ = mh / 40;
+  const offX = 25, offZ = 20;
+  minimapCtx.fillStyle = '#090817';
+  minimapCtx.fillRect(0, 0, mw, mh);
+  // Building outline
+  minimapCtx.strokeStyle = '#3F0E40';
+  minimapCtx.lineWidth = 1;
+  minimapCtx.strokeRect(1, 1, mw - 2, mh - 2);
+  // Zone markers
+  const zones = [
+    { x: -8, z: -15, label: 'DC', color: '#36C5F0' },
+    { x: 16, z: 14, label: 'CI', color: '#36C5F0' },
+    { x: 18, z: -2, label: 'PAY', color: '#E01E5A' },
+    { x: 16, z: -16, label: 'OPS', color: '#2EB67D' },
+    { x: -16, z: -16, label: 'TRD', color: '#ECB22E' },
+    { x: -16, z: 16, label: 'SEC', color: '#E01E5A' },
+    { x: 16, z: 16, label: 'CS', color: '#2EB67D' },
+  ];
+  zones.forEach(z => {
+    const mx = (z.x + offX) * scaleX;
+    const mz = (z.z + offZ) * scaleZ;
+    minimapCtx.fillStyle = z.color + '44';
+    minimapCtx.fillRect(mx - 6, mz - 4, 12, 8);
+    minimapCtx.fillStyle = z.color;
+    minimapCtx.font = '6px Courier New';
+    minimapCtx.textAlign = 'center';
+    minimapCtx.fillText(z.label, mx, mz + 2);
+  });
+  // Player dot
+  const px = (playerGroup.position.x + offX) * scaleX;
+  const pz = (playerGroup.position.z + offZ) * scaleZ;
+  minimapCtx.fillStyle = '#ffffff';
+  minimapCtx.beginPath();
+  minimapCtx.arc(px, pz, 3, 0, Math.PI * 2);
+  minimapCtx.fill();
+  // Objectives
+  objectives.forEach(obj => {
+    if (obj.done || !obj.available()) return;
+    const ox = (obj.pos.x + offX) * scaleX;
+    const oz = (obj.pos.z + offZ) * scaleZ;
+    minimapCtx.fillStyle = '#E01E5A';
+    minimapCtx.beginPath();
+    minimapCtx.arc(ox, oz, 3, 0, Math.PI * 2);
+    minimapCtx.fill();
+  });
+}
+
+// ── Portrait canvas (pixel art of player) ────────────────────────────────────
+function drawPortrait() {
+  const pc = document.getElementById('portrait-canvas');
+  const c  = pc.getContext('2d');
+  c.fillStyle = '#1a0a2a';
+  c.fillRect(0, 0, 36, 36);
+  // simple pixel art
+  c.fillStyle = '#c68642';
+  c.fillRect(12, 6, 12, 11); // head
+  c.fillStyle = '#2a1a0a';
+  c.fillRect(12, 6, 12, 5);  // hair
+  c.fillStyle = '#5a1a6a';
+  c.fillRect(10, 17, 16, 11); // body
+  c.fillStyle = '#36C5F0';
+  c.fillRect(23, 18, 5, 7);   // tablet
+  c.fillStyle = '#1a1a3a';
+  c.fillRect(12, 28, 5, 7);   // leg L
+  c.fillRect(19, 28, 5, 7);   // leg R
+}
+drawPortrait();
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+let walkPhase = 0;
+
+function tick(now) {
+  requestAnimationFrame(tick);
+  const dt = Math.min((now - lastTimestamp) / 1000, 0.1);
+  lastTimestamp = now;
+
+  if (gameState === 'playing') {
     // Timer
     if (timerRunning) {
-      timeLeft = Math.max(0, timeLeft - dt);
+      timeLeft   = Math.max(0, timeLeft - dt);
       hintCooldown = Math.max(0, hintCooldown - dt);
-      if (timeLeft <= 0 && incidentState !== 'resolved') {
-        state = 'end';
-        showEndScreen();
-        return;
-      }
-      // Health drain during incident
-      if (incidentState !== 'resolved') {
-        health = Math.max(0, health - dt * 0.5);
-      }
+      health     = Math.max(0, health - dt * 0.3);
+      if (timeLeft <= 0 && incidentsDone < TOTAL_INCIDENTS) endGame();
     }
 
     // Player movement
-    let dx = 0, dy = 0;
-    if (keys['ArrowLeft']  || keys['a'] || keys['A']) { dx = -1; player.dir = 'left'; }
-    if (keys['ArrowRight'] || keys['d'] || keys['D']) { dx =  1; player.dir = 'right'; }
-    if (keys['ArrowUp']    || keys['w'] || keys['W']) { dy = -1; player.dir = 'up'; }
-    if (keys['ArrowDown']  || keys['s'] || keys['S']) { dy =  1; player.dir = 'down'; }
+    let dx = 0, dz = 0;
+    if (keys['ArrowLeft']  || keys['a'] || keys['A']) dx = -1;
+    if (keys['ArrowRight'] || keys['d'] || keys['D']) dx =  1;
+    if (keys['ArrowUp']    || keys['w'] || keys['W']) dz = -1;
+    if (keys['ArrowDown']  || keys['s'] || keys['S']) dz =  1;
 
-    // Normalise diagonal
-    if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
-
-    const spd = player.speed;
-    player.moving = (dx !== 0 || dy !== 0);
-
-    // Move X
-    const nx = player.x + dx * spd;
-    if (!rectOverlapsTile(nx, player.y, player.w, player.h)) player.x = nx;
-
-    // Move Y
-    const ny = player.y + dy * spd;
-    if (!rectOverlapsTile(player.x, ny, player.w, player.h)) player.y = ny;
-
-    // Clamp to map
-    player.x = Math.max(TILE, Math.min(player.x, (MAP_W - 2) * TILE));
-    player.y = Math.max(TILE, Math.min(player.y, (MAP_H - 2) * TILE));
-
-    // Find nearest interactable
-    let nearest = null;
-    let nearDist = Infinity;
-    for (const obj of INTERACTABLES) {
-      if (!obj.available()) continue;
-      const ox = obj.col * TILE + TILE/2;
-      const oy = obj.row * TILE + TILE/2;
-      const px = player.x + player.w/2;
-      const py = player.y + player.h/2;
-      const dist = Math.hypot(ox - px, oy - py);
-      if (dist < 56 && dist < nearDist) { nearDist = dist; nearest = obj; }
+    const moving = dx !== 0 || dz !== 0;
+    if (moving) {
+      const len = Math.hypot(dx, dz);
+      playerGroup.position.x += (dx / len) * PLAYER_SPEED * dt;
+      playerGroup.position.z += (dz / len) * PLAYER_SPEED * dt;
+      if (dx !== 0 || dz !== 0) {
+        playerGroup.rotation.y = Math.atan2(dx, dz);
+      }
     }
-    interactTarget = nearest;
-    $prompt.textContent = nearest ? nearest.label : '';
+    clampPlayer(playerGroup.position);
+
+    // Walk animation
+    if (moving) {
+      walkPhase += dt * 8;
+      playerLegL.position.y = -0.25 + Math.sin(walkPhase) * 0.12;
+      playerLegR.position.y = -0.25 - Math.sin(walkPhase) * 0.12;
+      playerArmL.rotation.x =  Math.sin(walkPhase) * 0.3;
+      playerArmR.rotation.x = -Math.sin(walkPhase) * 0.3;
+    } else {
+      playerLegL.position.y = -0.25;
+      playerLegR.position.y = -0.25;
+      playerArmL.rotation.x = 0;
+      playerArmR.rotation.x = 0;
+    }
+
+    // Camera follow
+    camTarget.lerp(playerGroup.position, 0.07);
+    camera.position.x = camTarget.x + camOffset.x;
+    camera.position.y = camTarget.y + camOffset.y;
+    camera.position.z = camTarget.z + camOffset.z;
+    camera.lookAt(camTarget.x, camTarget.y + 2, camTarget.z);
+
+    // Find nearest objective
+    let nearest = null, nearDist = Infinity;
+    objectives.forEach(obj => {
+      if (obj.done || !obj.available()) return;
+      const d = playerGroup.position.distanceTo(obj.pos);
+      if (d < obj.radius && d < nearDist) { nearDist = d; nearest = obj.id; }
+    });
+    nearestObj = nearest;
+    const obj = nearest ? objectives.find(o => o.id === nearest) : null;
+    $prompt.textContent = obj ? obj.label : '';
     $prompt.style.display = nearest ? 'block' : 'none';
 
     updateHUD();
+    drawMinimap();
   }
 
-  // ─── Game loop ───────────────────────────────────────────────────────────────
-  function loop(now) {
-    const dt = Math.min((now - lastTime) / 1000, 0.1);
-    lastTime = now;
-    update(dt);
-    render();
-    requestAnimationFrame(loop);
-  }
+  // Animate beacons
+  const t = now * 0.002;
+  animatedBeacons.forEach((b, i) => {
+    b.material.emissiveIntensity = 0.8 + Math.sin(t * 3 + i) * 0.7;
+    b.scale.setScalar(0.9 + Math.sin(t * 3 + i) * 0.15);
+  });
 
-  // ─── Start / restart ─────────────────────────────────────────────────────────
-  function startGame() {
-    // Reset state
-    score = 0;
-    health = 100;
-    timeLeft = 300;
-    evidenceCollected = [];
-    incidentState = 'detected';
-    hintCooldown = 0;
-    dialogOpen = false;
-    player.x = 5 * TILE;
-    player.y = 8 * TILE;
-    $evList.innerHTML = '';
-    showEvidence(false);
-    $dialog.style.display = 'none';
-    $toast.style.display = 'none';
-    // Remove dynamic diagnosis interactable if added
-    const diagIdx = INTERACTABLES.findIndex(o => o.id === 'diagnose');
-    if (diagIdx >= 0) INTERACTABLES.splice(diagIdx, 1);
+  // Rotate cube installation
+  cubeInstall.rotation.y = t * 0.4;
+  cubeMat.emissiveIntensity = 0.4 + Math.sin(t) * 0.15;
 
-    document.getElementById('title-overlay').style.display = 'none';
-    document.getElementById('end-overlay').style.display = 'none';
-    document.getElementById('pause-overlay').style.display = 'none';
+  // NPC gentle bob
+  npcs.forEach((npc, i) => {
+    npc.position.y = 0.6 + Math.sin(t * 1.2 + i * 1.5) * 0.04;
+  });
 
-    timerRunning = true;
-    state = 'playing';
-    updateHUD();
-  }
+  renderer.render(scene, camera);
+}
 
-  function togglePause() {
-    if (state === 'playing') {
-      state = 'paused';
-      timerRunning = false;
-      document.getElementById('pause-overlay').style.display = 'flex';
-    } else if (state === 'paused') {
-      state = 'playing';
-      timerRunning = true;
-      document.getElementById('pause-overlay').style.display = 'none';
-    }
-  }
+// ── Wire buttons ──────────────────────────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('resume-btn').addEventListener('click', togglePause);
+document.getElementById('replay-btn').addEventListener('click', startGame);
+document.getElementById('hint-btn').addEventListener('click', showHint);
 
-  // ─── Button wiring ────────────────────────────────────────────────────────────
-  document.getElementById('start-btn').addEventListener('click', startGame);
-  document.getElementById('resume-btn').addEventListener('click', togglePause);
-  document.getElementById('replay-btn').addEventListener('click', startGame);
-  $hint.addEventListener('click', showHint);
-
-  // ─── Boot ─────────────────────────────────────────────────────────────────────
-  requestAnimationFrame(t => { lastTime = t; loop(t); });
-
-})();
+// ── Boot ──────────────────────────────────────────────────────────────────────
+resizeRenderer();
+requestAnimationFrame(t => { lastTimestamp = t; tick(t); });

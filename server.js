@@ -17,7 +17,7 @@ const TYPES = {
   ".json": "application/json",
 };
 
-const ALLOWED = /^\/(index\.html|game\.js|assets\/[\w./-]+)$/;
+const ALLOWED = /^\/(index\.html|game\.js|vendor\/[\w./-]+|assets\/[\w./-]+)$/;
 
 createServer(async (req, res) => {
   const path = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname));
