@@ -78,6 +78,7 @@ function buildWorld() {
   buildCustomerServices();
   buildStaircasesAndBridges();
   addDetails();
+  buildHolographicTower();
 }
 
 function buildOutdoorGround() {
@@ -280,10 +281,19 @@ function buildCentralAtrium() {
 // NatWest Data Centre — hot/cold aisle, detailed racks, CRAC units, cable trays
 // Room: x=-24..-14  z=-20..-10
 function buildDataCentre() {
-  // ── Raised floor — 2-tone checkerboard tiles
-  for (let x = -24; x <= -14; x++)
-    for (let z = -20; z <= -10; z++)
-      setSolid(x, 1, z, ((x+z) % 2 === 0) ? 0xbdc1ca : 0xd4d8e0);
+  // ── PCB circuit-board floor (dark green + copper traces)
+  for (let x = -24; x <= -14; x++) {
+    for (let z = -20; z <= -10; z++) {
+      const hTrace = (z % 3 === 0);
+      const vTrace = (x % 2 === 0);
+      const pad    = hTrace && vTrace;
+      const col = pad    ? 0x4a6820 :  // solder pad (bright green)
+                  hTrace ? 0x2e4418 :  // horizontal trace
+                  vTrace ? 0x283c14 :  // vertical trace
+                           0x1a2810;   // PCB base (dark)
+      setSolid(x, 1, z, col);
+    }
+  }
 
   // ── Walls — dark charcoal panels
   const DCWALL = 0x09101a;
@@ -812,6 +822,57 @@ function buildColumn(x, baseY, z, h, capColor) {
   }
 }
 
+// Holographic data-core tower — animates in tick()
+const holoRings = [];
+function buildHolographicTower() {
+  const g = new THREE.Group();
+
+  // Core column: 14 blocks tall, deep blue glow
+  for (let yi = 0; yi < 14; yi++) {
+    const shade = new THREE.Color().setHSL(0.62, 0.9, 0.12 + yi * 0.018);
+    const m = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 1.05, 0.55),
+      new THREE.MeshStandardMaterial({ color: shade, emissive: shade, emissiveIntensity: 1.4, roughness: 0.15 })
+    );
+    m.position.y = yi + 2.5;
+    g.add(m);
+  }
+
+  // Spinning rings at 6 heights
+  const ringCols = [0x0066ff, 0x0099ff, 0x00ccff, 0x44eeff, 0x88ffcc, 0xffffff];
+  ringCols.forEach((col, ri) => {
+    const rg = new THREE.Group();
+    rg.position.y = 3.5 + ri * 2.2;
+    const radius  = 1.1 + ri * 0.18;
+    const mat = new THREE.MeshStandardMaterial({
+      color: col, emissive: new THREE.Color(col), emissiveIntensity: 1.3,
+      roughness: 0.2, transparent: true, opacity: 0.88
+    });
+    const segCount = 6 + ri;
+    for (let si = 0; si < segCount; si++) {
+      const a = (si / segCount) * Math.PI * 2;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18 + ri * 0.04, 0.3), mat);
+      m.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+      rg.add(m);
+    }
+    g.add(rg);
+    holoRings.push({ rg, speed: 0.35 + ri * 0.12, dir: ri % 2 === 0 ? 1 : -1 });
+  });
+
+  // Base platform ring (wide, static)
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x001144, emissive: new THREE.Color(0x003399), emissiveIntensity: 0.9, roughness: 0.3 });
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const bm = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), baseMat);
+    bm.position.set(Math.cos(a) * 2.5, 2.15, Math.sin(a) * 2.5);
+    g.add(bm);
+  }
+
+  g.position.set(0.5, 1, 0.5);
+  scene.add(g);
+  return g;
+}
+
 // ─── Three.js setup ───────────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -878,6 +939,15 @@ ptLight( 12, 4, 0, 0xaa66ff, 8, 18);
 
 const hemi = new THREE.HemisphereLight(0x8866ff, 0x4422aa, 3.0);
 scene.add(hemi);
+
+// Zone alert lights — start dark, turn red when incidents active
+const zoneLights = {
+  beacon:     (() => { const l = new THREE.PointLight(0xff0033, 0, 22); l.position.set( 0,  5,  0); scene.add(l); return l; })(),
+  datacenter: (() => { const l = new THREE.PointLight(0xff1122, 0, 24); l.position.set(-19, 5,-15); scene.add(l); return l; })(),
+  cloud:      (() => { const l = new THREE.PointLight(0xff2200, 0, 22); l.position.set( 18, 5, 15); scene.add(l); return l; })(),
+  payments:   (() => { const l = new THREE.PointLight(0xff3300, 0, 20); l.position.set( 18, 5, -7); scene.add(l); return l; })(),
+  ops:        (() => { const l = new THREE.PointLight(0xff0044, 0, 22); l.position.set( 16,14,-15); scene.add(l); return l; })(),
+};
 
 // ─── Instanced block renderer ─────────────────────────────────────────────────
 const matCache = new Map();
@@ -1103,37 +1173,133 @@ function makeNPC(x, y, z, role) {
   return g;
 }
 
-// Floating issue enemy (DB Lock, API Error, etc.)
+// Floating issue enemies — 5 visually distinct types
 const issueEnemies = [];
 function makeIssueEnemy(x, y, z, type) {
   const g = new THREE.Group();
-  const configs = {
-    dbLock:   { col: 0x8822cc, em: 0x6600aa, shape: [0.7,0.8,0.7] },
-    apiError: { col: 0xff2244, em: 0xcc0022, shape: [0.65,0.65,0.65] },
-    memLeak:  { col: 0x22cc66, em: 0x009944, shape: [0.5,0.9,0.5] },
-    latency:  { col: 0xECB22E, em: 0xcc8800, shape: [0.8,0.5,0.4] },
-    queue:    { col: 0x4488ff, em: 0x2255cc, shape: [0.6,0.6,0.6] },
-    svcDown:  { col: 0xff3300, em: 0xcc2200, shape: [0.7,0.7,0.3] },
-  };
-  const cfg = configs[type] || configs.apiError;
-  const mat = new THREE.MeshStandardMaterial({
-    color: cfg.col, emissive: new THREE.Color(cfg.em), emissiveIntensity: 1.0, roughness: 0.3,
-  });
-  const core = new THREE.Mesh(new THREE.BoxGeometry(...cfg.shape), mat);
-  g.add(core);
-  // Warning icon (small red exclamation bar)
-  const warnMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const warnBar = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), warnMat);
-  warnBar.position.set(0, 0.7, 0);
-  g.add(warnBar);
-  const warnDot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), warnMat);
-  warnDot.position.set(0, 1.05, 0);
-  g.add(warnDot);
+  function part(w,h,d,col,ox,oy,oz,em=0) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: col, roughness: 0.35,
+      emissive: em ? new THREE.Color(em) : undefined,
+      emissiveIntensity: em ? 1.0 : 0,
+    });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    m.position.set(ox,oy,oz);
+    g.add(m); return m;
+  }
+
+  let core, mat, orbiters = [];
+
+  if (type === 'dbLock') {
+    // ERROR CRAWLER — red mechanical spider with error-symbol carapace
+    const bm = new THREE.MeshStandardMaterial({ color: 0xaa0011, emissive: new THREE.Color(0x880011), emissiveIntensity: 0.9, roughness: 0.35 });
+    core = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.75), bm); g.add(core); mat = bm;
+    // Error X on carapace
+    const xm = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+    [Math.PI/4, -Math.PI/4].forEach(r => {
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.1, 0.12), xm);
+      bar.rotation.z = r; bar.position.set(0, 0.32, 0.38); g.add(bar);
+    });
+    // Red eyes
+    part(0.16, 0.16, 0.1, 0xff0000, -0.2, 0.1, 0.39, 0xff2200);
+    part(0.16, 0.16, 0.1, 0xff0000,  0.2, 0.1, 0.39, 0xff2200);
+    // 6 articulated legs (3 per side)
+    [-0.52, 0.52].forEach(sx => {
+      [-0.22, 0, 0.22].forEach(sz => {
+        const leg = part(0.3, 0.07, 0.07, 0x771122, sx, -0.05, sz);
+        leg.rotation.z = sx < 0 ? 0.6 : -0.6;
+        orbiters.push({ m: leg, type: 'leg', phase: Math.random()*Math.PI*2 });
+      });
+    });
+    // Spark bits
+    part(0.1, 0.1, 0.1, 0xffaa00,  0.55, 0.4, 0.1, 0xff8800);
+    part(0.1, 0.1, 0.1, 0xffaa00, -0.55, 0.35, 0.05, 0xff6600);
+
+  } else if (type === 'memLeak') {
+    // MEMORY LEAK — translucent purple blob with orbiting memory fragment shards
+    const bm = new THREE.MeshStandardMaterial({ color: 0x7722cc, emissive: new THREE.Color(0x4411aa), emissiveIntensity: 1.1, roughness: 0.2, transparent: true, opacity: 0.82 });
+    core = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.88, 0.65), bm); g.add(core); mat = bm;
+    // Glowing horizontal eyes
+    part(0.32, 0.12, 0.1, 0xff88ff, -0.15, 0.2, 0.34, 0xff66ee);
+    part(0.32, 0.12, 0.1, 0xff88ff,  0.15, 0.2, 0.34, 0xff66ee);
+    // Bottom drips
+    part(0.14, 0.26, 0.14, 0x8833cc, -0.22, -0.6, 0, 0x6622cc);
+    part(0.14, 0.26, 0.14, 0x8833cc,  0.22, -0.6, 0, 0x6622cc);
+    part(0.1,  0.22, 0.1,  0x6622cc,   0,  -0.62, 0, 0x4411aa);
+    // Orbiting memory-block fragments
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const fr = part(0.22, 0.14, 0.12, 0xbb55ff, Math.cos(a)*0.72, 0.08, Math.sin(a)*0.72, 0xaa44ee);
+      orbiters.push({ m: fr, type: 'orbit', baseAngle: a, radius: 0.72, speed: 1.4, yBase: 0.08 });
+    }
+
+  } else if (type === 'apiError') {
+    // PACKET PHANTOM — fast cyan/magenta data-fragment cluster
+    const bm = new THREE.MeshStandardMaterial({ color: 0x00ccff, emissive: new THREE.Color(0x0088cc), emissiveIntensity: 1.0, roughness: 0.15, transparent: true, opacity: 0.75 });
+    core = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.72, 0.45), bm); g.add(core); mat = bm;
+    // Core eyes
+    part(0.18, 0.14, 0.08, 0xff44cc, -0.12, 0.12, 0.24, 0xff22cc);
+    part(0.18, 0.14, 0.08, 0xff44cc,  0.12, 0.12, 0.24, 0xff22cc);
+    // Data packet fragments
+    const fragCols = [0xff44cc, 0x00e5ff, 0xcc44ff, 0x44ffff, 0xff88ff, 0x00ffcc, 0xff00aa, 0x44aaff];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const r = 0.42 + (i % 3) * 0.1;
+      const yOff = (i % 2 === 0 ? 0.18 : -0.18);
+      const fr = part(0.14, 0.1, 0.08, fragCols[i], Math.cos(a)*r, yOff, Math.sin(a)*r, fragCols[i]);
+      orbiters.push({ m: fr, type: 'orbit', baseAngle: a, radius: r, speed: 2.8 - i*0.1, yBase: yOff });
+    }
+
+  } else if (type === 'latency') {
+    // CORRUPTION GOLEM — large heavy broken-server-rack enemy
+    const bm = new THREE.MeshStandardMaterial({ color: 0x3d1430, emissive: new THREE.Color(0x1a0818), emissiveIntensity: 0.5, roughness: 0.75 });
+    core = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 0.9), bm); g.add(core); mat = bm;
+    // Broken server rack shoulder pads
+    part(0.48, 0.38, 0.38, 0x0a1220, -0.88, 0.28, 0);
+    part(0.48, 0.38, 0.38, 0x0a1220,  0.88, 0.28, 0);
+    // Warning lights (pulsing red)
+    part(0.15, 0.15, 0.15, 0xff2244, -0.88, 0.58, 0.22, 0xff0022);
+    part(0.15, 0.15, 0.15, 0xff2244,  0.88, 0.58, 0.22, 0xff0022);
+    // Fractured shell cracks
+    part(0.28, 0.28, 0.14, 0x551033, -0.48, 0.5, 0.47);
+    part(0.22, 0.24, 0.12, 0x441028,  0.38, 0.58, 0.47);
+    // Glowing red eyes (large)
+    part(0.28, 0.24, 0.14, 0xff0000, -0.3, 0.22, 0.47, 0xff0000);
+    part(0.28, 0.24, 0.14, 0xff0000,  0.3, 0.22, 0.47, 0xff0000);
+    // Stubby legs
+    part(0.38, 0.34, 0.38, 0x2d0d22, -0.38, -0.72, 0);
+    part(0.38, 0.34, 0.38, 0x2d0d22,  0.38, -0.72, 0);
+
+  } else {
+    // RANSOMWARE OVERLORD — fortified boss with crown, glyphs, glowing eyes
+    const bm = new THREE.MeshStandardMaterial({ color: 0x1a0033, emissive: new THREE.Color(0x0d0022), emissiveIntensity: 0.6, roughness: 0.55 });
+    core = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.1, 0.85), bm); g.add(core); mat = bm;
+    // Crown battlements
+    [-0.32, 0, 0.32].forEach(cx => part(0.24, 0.3, 0.24, 0x2a0055, cx, 0.7, 0));
+    // Warning glyph side panels (pulsing red)
+    part(0.3, 0.42, 0.1, 0x880000, -0.55, 0.1, 0.44, 0xff1133);
+    part(0.3, 0.42, 0.1, 0x880000,  0.55, 0.1, 0.44, 0xff1133);
+    // Large glowing red eyes
+    part(0.28, 0.26, 0.14, 0xff0000, -0.22, 0.28, 0.44, 0xff0000);
+    part(0.28, 0.26, 0.14, 0xff0000,  0.22, 0.28, 0.44, 0xff0000);
+    // Armored pauldrons
+    part(0.42, 0.6, 0.42, 0x280044, -0.74, 0.28, 0);
+    part(0.42, 0.6, 0.42, 0x280044,  0.74, 0.28, 0);
+    // Short thick legs
+    part(0.38, 0.32, 0.38, 0x200033, -0.3, -0.74, 0);
+    part(0.38, 0.32, 0.38, 0x200033,  0.3, -0.74, 0);
+    // Orbiting glyph fragments
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      const gl = part(0.2, 0.2, 0.08, 0xff2244, Math.cos(a)*1.0, 0.1, Math.sin(a)*1.0, 0xff0033);
+      orbiters.push({ m: gl, type: 'orbit', baseAngle: a, radius: 1.0, speed: 0.8, yBase: 0.1 });
+    }
+  }
 
   g.position.set(x, y, z);
   scene.add(g);
   const phase = Math.random() * Math.PI * 2;
-  issueEnemies.push({ g, core, mat, phase, baseY: y });
+  issueEnemies.push({ g, core, mat, phase, baseY: y, orbiters, type });
   return g;
 }
 
@@ -1839,12 +2005,38 @@ function tick(now) {
     }
   });
 
-  // Issue enemy animation — bob and pulse
-  issueEnemies.forEach(({ g, mat, phase, baseY }) => {
-    g.position.y = baseY + Math.sin(t * 2.2 + phase) * 0.25;
-    g.rotation.y += 0.025;
+  // Issue enemy animation — bob, pulse, orbit fragments
+  issueEnemies.forEach(({ g, mat, phase, baseY, orbiters, type }) => {
+    const bobSpeed = type === 'latency' ? 1.4 : 2.2;
+    const bobAmt   = type === 'latency' ? 0.15 : 0.28;
+    g.position.y = baseY + Math.sin(t * bobSpeed + phase) * bobAmt;
+    const spinSpeed = type === 'latency' ? 0.012 : type === 'apiError' ? 0.04 : 0.025;
+    g.rotation.y += spinSpeed;
     mat.emissiveIntensity = 0.6 + Math.sin(t * 3.5 + phase) * 0.5;
+    // Animate orbiting fragments
+    orbiters.forEach(orb => {
+      if (orb.type === 'orbit') {
+        const a = orb.baseAngle + t * orb.speed;
+        orb.m.position.set(Math.cos(a) * orb.radius, orb.yBase + Math.sin(t*1.5+orb.baseAngle)*0.1, Math.sin(a) * orb.radius);
+      } else if (orb.type === 'leg') {
+        orb.m.rotation.x = Math.sin(t * 4 + orb.phase) * 0.4;
+      }
+    });
   });
+
+  // Holographic tower ring animation
+  holoRings.forEach(({ rg, speed, dir }) => {
+    rg.rotation.y += speed * dir * 0.008;
+  });
+
+  // Zone alert lights — pulse red when incident is active and not resolved
+  if (gameState === 'playing') {
+    Object.entries(zoneLights).forEach(([id, light]) => {
+      const obj = objectives.find(o => o.id === id);
+      const active = obj && !obj.done && obj.avail();
+      light.intensity = active ? (10 + Math.sin(t * 3.5) * 5) : 0;
+    });
+  }
 
   // Slackbot markers — bob + spin; hide when incident resolved
   slackbotMarkers.forEach(({ g, id, baseY, phase }) => {
