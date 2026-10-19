@@ -1044,7 +1044,7 @@ function movePlayer(dt) {
   // Update player mesh — face movement direction when moving, else face camera yaw
   playerMesh.position.set(player.x, player.y, player.z);
   if (moving) {
-    const targetFace = Math.atan2(nx, nz) + Math.PI;
+    const targetFace = Math.atan2(nx, nz);
     // Smooth rotation towards movement direction
     let diff = targetFace - playerMesh.rotation.y;
     while (diff > Math.PI)  diff -= Math.PI * 2;
