@@ -349,35 +349,59 @@ function buildCustomerServices() {
 }
 
 // Stairs and bridges connecting ground to mezzanine
+// Each staircase: 8 steps, y=2..9, stepping into the mezzanine zone
 function buildStaircasesAndBridges() {
-  // Staircase left side (x=-24, z=-8 to -3) going up to MEZ
-  for (let i = 0; i < MEZ; i++) {
-    fillBox(-24, i+2, -8+i, -23, i+2, -8+i, P.concreteLight);
+  // ── North staircases (toward Trading Floor / Ops Centre, z decreasing) ──
+  // Left-north: x=-24..-23, z starts at -8, steps to z=-15 as y 2→9
+  for (let i = 0; i < 8; i++) {
+    fillBox(-24, 2+i, -8-i, -23, 2+i, -8-i, P.concreteLight);
+    vox(-24, 2+i, -8-i, P.neonBlue, { emissive: P.neonBlue }); // lit edge strip
   }
-  // Staircase right side (x=23, z=8 to 3) going up to MEZ
-  for (let i = 0; i < MEZ; i++) {
-    fillBox(23, i+2, 8-i, 24, i+2, 8-i, P.concreteLight);
+  // Right-north: x=23..24, same direction
+  for (let i = 0; i < 8; i++) {
+    fillBox(23, 2+i, -8-i, 24, 2+i, -8-i, P.concreteLight);
+    vox(24, 2+i, -8-i, P.neonBlue, { emissive: P.neonBlue });
   }
-  // Bridge on mezzanine connecting left zones over atrium
+
+  // ── South staircases (toward Security / Customer Services, z increasing) ──
+  // Left-south: x=-24..-23, z starts at 8, steps to z=15
+  for (let i = 0; i < 8; i++) {
+    fillBox(-24, 2+i, 8+i, -23, 2+i, 8+i, P.concreteLight);
+    vox(-24, 2+i, 8+i, P.neonRed, { emissive: P.neonRed });
+  }
+  // Right-south: x=23..24
+  for (let i = 0; i < 8; i++) {
+    fillBox(23, 2+i, 8+i, 24, 2+i, 8+i, P.concreteLight);
+    vox(24, 2+i, 8+i, P.neonGreen, { emissive: P.neonGreen });
+  }
+
+  // ── Mezzanine bridge corridors (flat walkways at y=MEZ) ──
+  // North bridge left
   fillFloor(-24, -8, -10, -8, MEZ, P.floorTile);
-  // Railing on bridge
+  // North bridge right
+  fillFloor(8, 24, -10, -8, MEZ, P.floorTile);
+  // South bridge left
+  fillFloor(-24, -8, 8, 10, MEZ, P.floorTile);
+  // South bridge right
+  fillFloor(8, 24, 8, 10, MEZ, P.floorTile);
+
+  // Railings on north bridges
   for (let x = -22; x <= -10; x++) {
     vox(x, MEZ+1, -8, P.railing);
     vox(x, MEZ+2, -8, P.railingTop, { emissive: P.neonBlue });
   }
-  // Bridge right side
-  fillFloor(8, 24, -10, -8, MEZ, P.floorTile);
   for (let x = 10; x <= 22; x++) {
     vox(x, MEZ+1, -8, P.railing);
     vox(x, MEZ+2, -8, P.railingTop, { emissive: P.neonGreen });
   }
-  // Second staircase up left: x=8, z=-10 to -5
-  for (let i = 0; i < MEZ; i++) {
-    fillBox(-10, i+2, -10+i, -9, i+2, -10+i, P.concreteLight);
+  // Railings on south bridges
+  for (let x = -22; x <= -10; x++) {
+    vox(x, MEZ+1, 10, P.railing);
+    vox(x, MEZ+2, 10, P.railingTop, { emissive: P.neonRed });
   }
-  // Staircase right up: x=10, z=5
-  for (let i = 0; i < MEZ; i++) {
-    fillBox(9, i+2, 10-i, 10, i+2, 10-i, P.concreteLight);
+  for (let x = 10; x <= 22; x++) {
+    vox(x, MEZ+1, 10, P.railing);
+    vox(x, MEZ+2, 10, P.railingTop, { emissive: P.neonGreen });
   }
 }
 
@@ -983,13 +1007,27 @@ function movePlayer(dt) {
   // Gravity
   if (!player.onGround) player.vy += GRAVITY * dt;
 
-  // Move X
+  // Move X (with 1-block step-up for stairs)
   const npx = player.x + player.vx * dt;
-  if (!collidesXZ(npx, player.y, player.z)) player.x = npx; else player.vx = 0;
+  if (!collidesXZ(npx, player.y, player.z)) {
+    player.x = npx;
+  } else if (player.onGround && !collidesXZ(npx, player.y + 1.01, player.z)) {
+    player.x = npx;
+    player.y += 1.01;
+  } else {
+    player.vx = 0;
+  }
 
-  // Move Z
+  // Move Z (with 1-block step-up for stairs)
   const npz = player.z + player.vz * dt;
-  if (!collidesXZ(player.x, player.y, npz)) player.z = npz; else player.vz = 0;
+  if (!collidesXZ(player.x, player.y, npz)) {
+    player.z = npz;
+  } else if (player.onGround && !collidesXZ(player.x, player.y + 1.01, npz)) {
+    player.z = npz;
+    player.y += 1.01;
+  } else {
+    player.vz = 0;
+  }
 
   // Move Y
   const npy = player.y + player.vy * dt;
