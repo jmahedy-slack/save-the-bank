@@ -1,0 +1,16 @@
+{
+  "name": "SEV-1: Save the Bank",
+  "short_name": "SaveTheBank",
+  "description": "NatWest Engineering Arcade — respond to a live SEV-1 incident before the bank goes down.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#090817",
+  "theme_color": "#3F0E40",
+  "icons": [
+    { "src": "/assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "categories": ["games", "education"],
+  "lang": "en-GB"
+}

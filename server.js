@@ -17,7 +17,7 @@ const TYPES = {
   ".json": "application/json",
 };
 
-const ALLOWED = /^\/(index\.html|game\.js|vendor\/[\w./-]+|assets\/[\w./-]+)$/;
+const ALLOWED = /^\/(index\.html|game\.js|manifest\.json|vendor\/[\w./-]+|assets\/[\w./-]+)$/;
 
 createServer(async (req, res) => {
   const path = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname));
@@ -38,7 +38,7 @@ createServer(async (req, res) => {
     let body = await readFile(join(ROOT, file));
     const type = TYPES[extname(file)] || "application/octet-stream";
     const headers = { "content-type": type, "cache-control": "public, max-age=60" };
-    if (/html|javascript|css/.test(type) && /\bgzip\b/.test(req.headers["accept-encoding"] || "")) {
+    if (/html|javascript|css|json/.test(type) && /\bgzip\b/.test(req.headers["accept-encoding"] || "")) {
       body = gzipSync(body);
       headers["content-encoding"] = "gzip";
     }

@@ -548,40 +548,193 @@ function makeRng(seed) {
 
 // ─── NPC characters ───────────────────────────────────────────────────────────
 const npcAnimated = [];
-function makeNPC(x, y, z, shirt) {
+
+// Roles: 'branch' | 'engineering' | 'security' | 'product' | 'leadership' | 'ai'
+function makeNPC(x, y, z, role) {
+  const rng = makeRng((x * 31 + z * 17) & 0xffff);
   const g = new THREE.Group();
-  function b(w,h,d,col,ox,oy,oz) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
-      new THREE.MeshStandardMaterial({ color: col, roughness: 0.8 }));
+
+  function part(w,h,d,col,ox,oy,oz,em=0) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: col, roughness: 0.8,
+      emissive: em ? new THREE.Color(em) : undefined,
+      emissiveIntensity: em ? 0.7 : 0,
+    });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
     m.position.set(ox,oy,oz);
     g.add(m);
     return m;
   }
-  b(0.6,0.8,0.4, shirt, 0, 0.4, 0);    // body
-  b(0.5,0.5,0.5, P.skin, 0, 1.05, 0);  // head
-  b(0.5,0.15,0.52, makeRng(shirt)() > 0.5 ? P.hairDark : P.hairBrown, 0, 1.35, 0); // hair
-  const lleg = b(0.22,0.5,0.22, P.trousers, -0.18, -0.25, 0);
-  const rleg = b(0.22,0.5,0.22, P.trousers,  0.18, -0.25, 0);
-  b(0.15,0.4,0.15, P.shoes, -0.18, -0.54, 0);
-  b(0.15,0.4,0.15, P.shoes,  0.18, -0.54, 0);
-  g.position.set(x + 0.5, y + 1.2, z + 0.5);
+
+  const skinTones = [0xc68642, 0xd4956a, 0x8d5524, 0xe8b89a];
+  const skin = skinTones[Math.floor(rng() * skinTones.length)];
+  const hairCols = [P.hairDark, P.hairBrown, P.hairBlond, 0x1a1a1a];
+  const hair = hairCols[Math.floor(rng() * hairCols.length)];
+
+  let lleg, rleg;
+
+  if (role === 'ai') {
+    // Floating blue robot
+    part(0.8,0.8,0.6, 0x1a4a8a, 0, 0.4, 0);                          // torso
+    part(0.7,0.65,0.65, 0x2266cc, 0, 1.1, 0);                         // head
+    part(0.1,0.5,0.1, P.neonBlue, 0, 1.6, 0, P.neonBlue);            // antenna
+    part(0.15,0.15,0.15, P.neonCyan, 0, 1.6, 0, P.neonCyan);         // antenna tip
+    part(0.28,0.2,0.1, P.neonBlue, -0.15, 1.1, 0.34, P.neonBlue);   // eye L
+    part(0.28,0.2,0.1, P.neonBlue,  0.15, 1.1, 0.34, P.neonBlue);   // eye R
+    part(0.25,0.55,0.25, 0x1a4a8a, -0.55, 0.38, 0);                   // arm L
+    part(0.25,0.55,0.25, 0x1a4a8a,  0.55, 0.38, 0);                   // arm R
+    lleg = part(0.3,0.45,0.3, 0x163a70, -0.2, -0.225, 0);
+    rleg = part(0.3,0.45,0.3, 0x163a70,  0.2, -0.225, 0);
+    g.position.set(x + 0.5, y + 1.5, z + 0.5); // floats slightly higher
+  } else if (role === 'engineering') {
+    // Hoodie, casual — SRE/DevOps/Platform engineers
+    const hoodieCols = [0x3a2060, 0x1e3a5a, 0x2a4030, 0x3a1a1a];
+    const hoodie = hoodieCols[Math.floor(rng() * hoodieCols.length)];
+    part(0.65,0.85,0.45, hoodie, 0, 0.425, 0);     // body/hoodie
+    part(0.55,0.55,0.55, skin, 0, 1.1, 0);          // head
+    part(0.55,0.2,0.57, hair, 0, 1.38, 0);          // hair
+    part(0.16,0.12,0.05, 0x888888, -0.14, 1.1, 0.29); // glasses L
+    part(0.16,0.12,0.05, 0x888888,  0.14, 1.1, 0.29); // glasses R
+    lleg = part(0.24,0.52,0.24, 0x222235, -0.18, -0.26, 0); // dark jeans
+    rleg = part(0.24,0.52,0.24, 0x222235,  0.18, -0.26, 0);
+    part(0.18,0.12,0.28, 0x333355, -0.18, -0.56, 0);  // trainers L
+    part(0.18,0.12,0.28, 0x333355,  0.18, -0.56, 0);  // trainers R
+    part(0.22,0.55,0.22, hoodie, -0.48, 0.38, 0);      // arm L
+    part(0.22,0.55,0.22, hoodie,  0.48, 0.38, 0);      // arm R
+    // Laptop in hand
+    part(0.35,0.22,0.04, 0x444455, 0.6, 0.45, 0.12);
+    g.position.set(x + 0.5, y + 1.2, z + 0.5);
+  } else if (role === 'security') {
+    // Dark uniform, badge
+    part(0.65,0.85,0.45, 0x1a1a2a, 0, 0.425, 0);  // dark jacket
+    part(0.55,0.55,0.55, skin, 0, 1.1, 0);          // head
+    part(0.55,0.2,0.57, hair, 0, 1.38, 0);          // hair
+    lleg = part(0.24,0.52,0.24, 0x0a0a14, -0.18, -0.26, 0); // black trousers
+    rleg = part(0.24,0.52,0.24, 0x0a0a14,  0.18, -0.26, 0);
+    part(0.18,0.12,0.28, 0x111118, -0.18, -0.56, 0);  // boots
+    part(0.18,0.12,0.28, 0x111118,  0.18, -0.56, 0);
+    part(0.22,0.55,0.22, 0x1a1a2a, -0.48, 0.38, 0);   // arm L
+    part(0.22,0.55,0.22, 0x1a1a2a,  0.48, 0.38, 0);   // arm R
+    part(0.18,0.12,0.06, P.neonAmber, 0.18, 0.72, 0.25, P.neonAmber); // badge (glows)
+    part(0.12,0.06,0.04, 0xffffff, -0.22, 0.65, 0.25); // name tag
+    g.position.set(x + 0.5, y + 1.2, z + 0.5);
+  } else if (role === 'leadership') {
+    // Smart business attire — suit jacket
+    const suitCols = [0x3F0E40, 0x1a2055, 0x222222, 0x2a1a40];
+    const suit = suitCols[Math.floor(rng() * suitCols.length)];
+    part(0.65,0.85,0.45, suit, 0, 0.425, 0);     // jacket
+    part(0.2,0.55,0.12, 0xffffff, 0, 0.5, 0.24); // shirt front
+    part(0.06,0.35,0.08, P.natwestRed, 0, 0.62, 0.27); // tie
+    part(0.55,0.55,0.55, skin, 0, 1.1, 0);        // head
+    part(0.55,0.2,0.57, hair, 0, 1.38, 0);
+    lleg = part(0.24,0.52,0.24, 0x222235, -0.18, -0.26, 0);
+    rleg = part(0.24,0.52,0.24, 0x222235,  0.18, -0.26, 0);
+    part(0.18,0.12,0.28, P.shoes, -0.18, -0.56, 0);
+    part(0.18,0.12,0.28, P.shoes,  0.18, -0.56, 0);
+    part(0.22,0.55,0.22, suit, -0.48, 0.38, 0);
+    part(0.22,0.55,0.22, suit,  0.48, 0.38, 0);
+    g.position.set(x + 0.5, y + 1.2, z + 0.5);
+  } else if (role === 'product') {
+    // Colourful casual tech clothing
+    const casualCols = [0xe05050, 0x50a0e0, 0x50c080, 0xd080d0, 0xe0c050];
+    const casual = casualCols[Math.floor(rng() * casualCols.length)];
+    part(0.65,0.85,0.45, casual, 0, 0.425, 0);    // top
+    part(0.55,0.55,0.55, skin, 0, 1.1, 0);
+    part(0.55,0.2,0.57, hair, 0, 1.38, 0);
+    lleg = part(0.24,0.52,0.24, 0x2a2a50, -0.18, -0.26, 0);
+    rleg = part(0.24,0.52,0.24, 0x2a2a50,  0.18, -0.26, 0);
+    part(0.18,0.12,0.28, P.shoes, -0.18, -0.56, 0);
+    part(0.18,0.12,0.28, P.shoes,  0.18, -0.56, 0);
+    part(0.22,0.55,0.22, casual, -0.48, 0.38, 0);
+    part(0.22,0.55,0.22, casual,  0.48, 0.38, 0);
+    g.position.set(x + 0.5, y + 1.2, z + 0.5);
+  } else {
+    // Branch: formal navy/purple suit with lanyard
+    const branchSuit = rng() > 0.5 ? 0x1a2055 : 0x3F0E40;
+    part(0.65,0.85,0.45, branchSuit, 0, 0.425, 0);
+    part(0.2,0.55,0.12, 0xffffff, 0, 0.5, 0.24);
+    // Lanyard
+    part(0.06,0.5,0.04, P.neonAmber, 0, 0.8, 0.26, P.neonAmber);
+    part(0.12,0.1,0.04, 0xffffff, 0, 0.55, 0.27);
+    part(0.55,0.55,0.55, skin, 0, 1.1, 0);
+    part(0.55,0.2,0.57, hair, 0, 1.38, 0);
+    lleg = part(0.24,0.52,0.24, 0x1a1a30, -0.18, -0.26, 0);
+    rleg = part(0.24,0.52,0.24, 0x1a1a30,  0.18, -0.26, 0);
+    part(0.18,0.12,0.28, P.shoes, -0.18, -0.56, 0);
+    part(0.18,0.12,0.28, P.shoes,  0.18, -0.56, 0);
+    part(0.22,0.55,0.22, branchSuit, -0.48, 0.38, 0);
+    part(0.22,0.55,0.22, branchSuit,  0.48, 0.38, 0);
+    g.position.set(x + 0.5, y + 1.2, z + 0.5);
+  }
+
   scene.add(g);
-  const phase = makeRng(x * 7 + z)() * Math.PI * 2;
-  npcAnimated.push({ g, lleg, rleg, phase });
+  const phase = rng() * Math.PI * 2;
+  g.userData.baseY = g.position.y;
+  npcAnimated.push({ g, lleg, rleg, phase, isAI: role === 'ai' });
+  return g;
+}
+
+// Floating issue enemy (DB Lock, API Error, etc.)
+const issueEnemies = [];
+function makeIssueEnemy(x, y, z, type) {
+  const g = new THREE.Group();
+  const configs = {
+    dbLock:   { col: 0x8822cc, em: 0x6600aa, shape: [0.7,0.8,0.7] },
+    apiError: { col: 0xff2244, em: 0xcc0022, shape: [0.65,0.65,0.65] },
+    memLeak:  { col: 0x22cc66, em: 0x009944, shape: [0.5,0.9,0.5] },
+    latency:  { col: 0xECB22E, em: 0xcc8800, shape: [0.8,0.5,0.4] },
+    queue:    { col: 0x4488ff, em: 0x2255cc, shape: [0.6,0.6,0.6] },
+    svcDown:  { col: 0xff3300, em: 0xcc2200, shape: [0.7,0.7,0.3] },
+  };
+  const cfg = configs[type] || configs.apiError;
+  const mat = new THREE.MeshStandardMaterial({
+    color: cfg.col, emissive: new THREE.Color(cfg.em), emissiveIntensity: 1.0, roughness: 0.3,
+  });
+  const core = new THREE.Mesh(new THREE.BoxGeometry(...cfg.shape), mat);
+  g.add(core);
+  // Warning icon (small red exclamation bar)
+  const warnMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const warnBar = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), warnMat);
+  warnBar.position.set(0, 0.7, 0);
+  g.add(warnBar);
+  const warnDot = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), warnMat);
+  warnDot.position.set(0, 1.05, 0);
+  g.add(warnDot);
+
+  g.position.set(x, y, z);
+  scene.add(g);
+  const phase = Math.random() * Math.PI * 2;
+  issueEnemies.push({ g, core, mat, phase, baseY: y });
   return g;
 }
 
 function spawnNPCs() {
-  const shirts = [P.shirt1, P.shirt2, P.shirt3, P.shirt4, 0xffffff, 0x8833ff];
-  // Ground floor atrium
-  [[-5,1,-5],[-3,1,5],[5,1,-3],[3,1,6],[-2,1,-6],[0,1,0]].forEach(([x,y,z],i) =>
-    makeNPC(x, y, z, shirts[i % shirts.length]));
-  // Data centre
-  [[-22,1,-15],[-20,1,-13],[-18,1,-16]].forEach(([x,y,z],i) =>
-    makeNPC(x, y, z, shirts[i % shirts.length]));
-  // Mezzanine zones
-  [[-20,MEZ,-17],[-15,MEZ,-12],[10,MEZ,-14],[18,MEZ,-12],[-18,MEZ,15],[12,MEZ,14]].forEach(([x,y,z],i) =>
-    makeNPC(x, y, z, shirts[i % shirts.length]));
+  // Central atrium — Branch staff (reception)
+  [[-5,1,-5],[-3,1,5],[5,1,-3],[2,1,6]].forEach(([x,y,z]) => makeNPC(x, y, z, 'branch'));
+  // AI Assistant robot in atrium centre
+  makeNPC(1, 1, 1, 'ai');
+  // Data centre — Engineering NPCs
+  [[-22,1,-15],[-20,1,-13],[-18,1,-16],[-16,1,-14]].forEach(([x,y,z]) => makeNPC(x, y, z, 'engineering'));
+  // Cloud & Infra — Engineering NPCs
+  [[16,1,14],[18,1,16],[20,1,13]].forEach(([x,y,z]) => makeNPC(x, y, z, 'engineering'));
+  // Payments — Product NPCs
+  [[16,1,-9],[18,1,-7],[20,1,-11]].forEach(([x,y,z]) => makeNPC(x, y, z, 'product'));
+  // Trading Floor mezzanine — Leadership
+  [[-22,MEZ,-17],[-18,MEZ,-13]].forEach(([x,y,z]) => makeNPC(x, y, z, 'leadership'));
+  // Operations Centre mezzanine — Engineering
+  [[10,MEZ,-14],[14,MEZ,-12],[18,MEZ,-15]].forEach(([x,y,z]) => makeNPC(x, y, z, 'engineering'));
+  // Security mezzanine — Security NPCs
+  [[-22,MEZ,17],[-18,MEZ,15],[-14,MEZ,18]].forEach(([x,y,z]) => makeNPC(x, y, z, 'security'));
+  // Customer Services mezzanine — Product/Branch
+  [[12,MEZ,14],[16,MEZ,16],[20,MEZ,13]].forEach(([x,y,z]) => makeNPC(x, y, z, 'product'));
+
+  // Issue enemies near incident zones
+  makeIssueEnemy(-19.5, 4,  -15,   'dbLock');   // data centre — DB Lock
+  makeIssueEnemy( 18,   4,   14,   'latency');   // cloud — Latency Spike
+  makeIssueEnemy( 18,   4,   -7,   'apiError');  // payments — API Error
+  makeIssueEnemy( 16, MEZ+4, -14,  'svcDown');   // ops centre — Service Down
+  makeIssueEnemy( -1,   5,    0,   'queue');      // atrium beacon — Queue Backlog
+  makeIssueEnemy(-16, MEZ+4, -15,  'memLeak');   // trading floor — Memory Leak
 }
 
 // ─── Player character ─────────────────────────────────────────────────────────
@@ -623,30 +776,78 @@ const player = {
   onGround: false,
 };
 
-// Third-person camera offset: behind and above — zoomed out for better world view
-const CAM_BACK  = 6.5;
-const CAM_UP    = 3.2;
-const CAM_LERP  = 0.10;
-const camPos = new THREE.Vector3();
+// Third-person camera — fixed offset behind player; pitch only tilts lookAt, not cam position
+const CAM_BACK = 7;
+const CAM_UP   = 3.5;
+const camPos   = new THREE.Vector3();
+const camLook  = new THREE.Vector3();
 
-function updateCamera() {
+function updateCamera(dt) {
   const sinY = Math.sin(player.yaw);
   const cosY = Math.cos(player.yaw);
-  const sinP = Math.sin(player.pitch);
-  const target = new THREE.Vector3(
-    player.x - sinY * Math.cos(player.pitch) * CAM_BACK,
-    player.y + PLAYER_HEIGHT + CAM_UP + sinP * CAM_BACK,
-    player.z - cosY * Math.cos(player.pitch) * CAM_BACK,
-  );
-  camPos.lerp(target, CAM_LERP);
-  camera.position.copy(camPos);
-  camera.lookAt(player.x, player.y + PLAYER_HEIGHT * 0.8, player.z);
+  const alpha = 1 - Math.pow(0.04, dt);
+
+  if (viewMode === 1) {
+    // First-person: camera at eye level, no back offset, hides player mesh
+    const eyeTarget = new THREE.Vector3(
+      player.x,
+      player.y + PLAYER_HEIGHT * 0.9,
+      player.z,
+    );
+    camPos.lerp(eyeTarget, alpha * 2);
+    camera.position.copy(camPos);
+    const lookDist = 8;
+    const lookY = player.y + PLAYER_HEIGHT * 0.9 - Math.sin(player.pitch) * lookDist;
+    const lookTarget = new THREE.Vector3(
+      player.x + sinY * lookDist,
+      lookY,
+      player.z + cosY * lookDist,
+    );
+    camLook.lerp(lookTarget, alpha * 2);
+    camera.lookAt(camLook);
+
+  } else if (viewMode === 2) {
+    // Top-down overview: directly above, looking down
+    const topTarget = new THREE.Vector3(
+      player.x,
+      player.y + 28,
+      player.z,
+    );
+    camPos.lerp(topTarget, alpha);
+    camera.position.copy(camPos);
+    const downLook = new THREE.Vector3(player.x, player.y, player.z);
+    camLook.lerp(downLook, alpha * 1.5);
+    camera.lookAt(camLook);
+
+  } else {
+    // Third-person: fixed offset behind+above, pitch only moves lookAt
+    const target = new THREE.Vector3(
+      player.x - sinY * CAM_BACK,
+      player.y + PLAYER_HEIGHT + CAM_UP,
+      player.z - cosY * CAM_BACK,
+    );
+    camPos.lerp(target, alpha);
+    camera.position.copy(camPos);
+    const lookDist = 6;
+    const lookY = player.y + PLAYER_HEIGHT * 0.8 - Math.sin(player.pitch) * lookDist;
+    const lookTarget = new THREE.Vector3(
+      player.x + sinY * lookDist,
+      lookY,
+      player.z + cosY * lookDist,
+    );
+    camLook.lerp(lookTarget, alpha * 1.5);
+    camera.lookAt(camLook);
+  }
 }
 
 // ─── Input ────────────────────────────────────────────────────────────────────
 const keys = {};
 let pointerLocked = false;
 let mouseDX = 0, mouseDY = 0;
+
+// 0 = third-person, 1 = first-person, 2 = top-down overview
+let viewMode = 0;
+const VIEW_LABELS = ['Third Person', 'First Person', 'Top Down'];
 
 window.addEventListener('keydown', e => {
   keys[e.key] = true;
@@ -656,6 +857,12 @@ window.addEventListener('keydown', e => {
   }
   if ((e.key === 'e' || e.key === 'E') && (gameState === 'playing' || gameState === 'dialog')) doInteract();
   if ((e.key === 'h' || e.key === 'H') && gameState === 'playing') showHint();
+  if ((e.key === 'v' || e.key === 'V') && gameState === 'playing') {
+    viewMode = (viewMode + 1) % 3;
+    showToast('View: ' + VIEW_LABELS[viewMode], '#36C5F0');
+    // Show/hide player mesh in first-person
+    playerMesh.visible = viewMode !== 1;
+  }
   if (e.key === ' ' && gameState === 'playing' && player.onGround) {
     player.vy = JUMP_SPEED;
     player.onGround = false;
@@ -1079,14 +1286,27 @@ function tick(now) {
   }
 
   // Camera always follows
-  updateCamera();
+  updateCamera(dt);
 
   // NPC animation
-  npcAnimated.forEach(({ g, lleg, rleg, phase }) => {
-    g.position.y += Math.sin(t * 1.5 + phase) * 0.0005;
-    const walk = Math.sin(t * 2.5 + phase) * 0.15;
-    if (lleg) lleg.rotation.x =  walk;
-    if (rleg) rleg.rotation.x = -walk;
+  npcAnimated.forEach(({ g, lleg, rleg, phase, isAI }) => {
+    if (isAI) {
+      // Float up and down, slow rotation
+      g.position.y = g.userData.baseY + Math.sin(t * 1.2 + phase) * 0.18;
+      g.rotation.y += 0.008;
+    } else {
+      g.position.y += Math.sin(t * 1.5 + phase) * 0.0005;
+      const walk = Math.sin(t * 2.5 + phase) * 0.12;
+      if (lleg) lleg.rotation.x =  walk;
+      if (rleg) rleg.rotation.x = -walk;
+    }
+  });
+
+  // Issue enemy animation — bob and pulse
+  issueEnemies.forEach(({ g, mat, phase, baseY }) => {
+    g.position.y = baseY + Math.sin(t * 2.2 + phase) * 0.25;
+    g.rotation.y += 0.025;
+    mat.emissiveIntensity = 0.6 + Math.sin(t * 3.5 + phase) * 0.5;
   });
 
   // Alert pulsing
