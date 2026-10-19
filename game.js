@@ -8,7 +8,7 @@ import * as THREE from 'three';
 const P = {
   // Floors
   marbleDark: 0x14182a, marbleLight: 0x1e2438, marbleMid: 0x191e30,
-  goldInlay: 0x7a5e24, goldBright: 0xc49a38,
+  goldInlay: 0x3a2c0e, goldBright: 0x5e4418,
   carpet: 0x180e28, carpetLit: 0x231540,
   pcbBase: 0x0f1a08, pcbTrace: 0x1c2e10, pcbPad: 0x2e4818, pcbVia: 0x4a6820,
   concrete: 0x1e2228, concreteDark: 0x14181e, concreteLight: 0x2c3240,
@@ -189,12 +189,11 @@ function buildCentralAtrium() {
       const wx = ((x + 24) % 5);
       const glass = wx >= 1 && wx <= 3 && y >= 3 && y <= 7;
       if (glass) {
-        setSolid(x, y, -D, P.glassBright, { emissive: 0x002244 });
+        setSolid(x, y, -D, P.glassDim);
       } else if (wx === 0 || wx === 4) {
         setSolid(x, y, -D, P.wallAccent, (y % 4 === 0) ? { emissive: P.neonBlue } : {});
       } else {
-        const isPilH = (y % 4 === 0);
-        setSolid(x, y, -D, isPilH ? P.wallPanel : P.wallBase);
+        setSolid(x, y, -D, (y % 4 === 0) ? P.wallPanel : P.wallBase);
       }
     }
   }
@@ -204,12 +203,11 @@ function buildCentralAtrium() {
       const wx = ((x + 24) % 5);
       const glass = wx >= 1 && wx <= 3 && y >= 3 && y <= 7;
       if (glass) {
-        setSolid(x, y, D, P.glassBright, { emissive: 0x002244 });
+        setSolid(x, y, D, P.glassDim);
       } else if (wx === 0 || wx === 4) {
         setSolid(x, y, D, P.wallAccent, (y % 4 === 0) ? { emissive: P.neonBlue } : {});
       } else {
-        const isPilH = (y % 4 === 0);
-        setSolid(x, y, D, isPilH ? P.wallPanel : P.wallBase);
+        setSolid(x, y, D, (y % 4 === 0) ? P.wallPanel : P.wallBase);
       }
     }
   }
@@ -900,7 +898,7 @@ function buildHolographicTower() {
     const shade = new THREE.Color().setHSL(0.62, 0.9, 0.12 + yi * 0.018);
     const m = new THREE.Mesh(
       new THREE.BoxGeometry(0.55, 1.05, 0.55),
-      new THREE.MeshStandardMaterial({ color: shade, emissive: shade, emissiveIntensity: 1.4, roughness: 0.15 })
+      new THREE.MeshStandardMaterial({ color: shade, emissive: shade, emissiveIntensity: 0.6, roughness: 0.2 })
     );
     m.position.y = yi + 2.5;
     g.add(m);
@@ -913,8 +911,8 @@ function buildHolographicTower() {
     rg.position.y = 3.5 + ri * 2.2;
     const radius  = 1.1 + ri * 0.18;
     const mat = new THREE.MeshStandardMaterial({
-      color: col, emissive: new THREE.Color(col), emissiveIntensity: 1.3,
-      roughness: 0.2, transparent: true, opacity: 0.88
+      color: col, emissive: new THREE.Color(col), emissiveIntensity: 0.55,
+      roughness: 0.25, transparent: true, opacity: 0.85
     });
     const segCount = 6 + ri;
     for (let si = 0; si < segCount; si++) {
@@ -928,7 +926,7 @@ function buildHolographicTower() {
   });
 
   // Base platform ring (wide, static)
-  const baseMat = new THREE.MeshStandardMaterial({ color: 0x001144, emissive: new THREE.Color(0x003399), emissiveIntensity: 0.9, roughness: 0.3 });
+  const baseMat = new THREE.MeshStandardMaterial({ color: 0x001033, emissive: new THREE.Color(0x001a55), emissiveIntensity: 0.4, roughness: 0.35 });
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2;
     const bm = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), baseMat);
@@ -947,7 +945,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.8;
+renderer.toneMappingExposure = 0.75;
 document.getElementById('renderer-container').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -964,10 +962,10 @@ window.addEventListener('resize', resizeRenderer);
 resizeRenderer();
 
 // ─── Lights ───────────────────────────────────────────────────────────────────
-const ambient = new THREE.AmbientLight(0x9ab0cc, 4.5);
+const ambient = new THREE.AmbientLight(0x8aa0c0, 2.5);
 scene.add(ambient);
 
-const sun = new THREE.DirectionalLight(0xe8f0ff, 2.8);
+const sun = new THREE.DirectionalLight(0xd8e8ff, 1.8);
 sun.position.set(15, 40, 20);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
@@ -977,8 +975,7 @@ sun.shadow.camera.left = sun.shadow.camera.bottom = -40;
 sun.shadow.camera.right = sun.shadow.camera.top = 40;
 scene.add(sun);
 
-// Cool blue fill light
-const fillLight = new THREE.DirectionalLight(0x4488cc, 1.2);
+const fillLight = new THREE.DirectionalLight(0x3366aa, 0.7);
 fillLight.position.set(-10, 20, -15);
 scene.add(fillLight);
 
@@ -988,25 +985,24 @@ function ptLight(x, y, z, color, intensity, dist) {
   scene.add(l);
   return l;
 }
-// Atrium — cool blue, not purple
-ptLight(0, 8, 0, 0x2244aa, 18, 36);
-ptLight(0, 3, 0, 0x36C5F0, 14, 28);
+// Atrium — cool blue
+ptLight(0, 8, 0, 0x1a3388, 12, 36);
+ptLight(0, 3, 0, 0x2a9ccc, 8, 28);
 // Zone fills
-ptLight(-19, 5, -15, 0x22aaff, 16, 28);  // data centre
-ptLight(18, 5, 15, 0x00e5ff, 14, 26);    // cloud
-ptLight(18, 5, -7, 0xffaa00, 14, 24);    // payments
-ptLight(-16, 14, -15, 0xffcc00, 16, 28); // trading floor
-ptLight(16, 14, -15, 0x22aaff, 16, 28);  // ops centre
-ptLight(-16, 14, 15, 0xff3344, 14, 26);  // security
-ptLight(16, 14, 15, 0x22ff88, 14, 26);   // customer services
+ptLight(-19, 5, -15, 0x1a88cc, 10, 28);  // data centre
+ptLight(18, 5, 15, 0x00aacc, 9, 26);     // cloud
+ptLight(18, 5, -7, 0xcc8800, 9, 24);     // payments
+ptLight(-16, 14, -15, 0xcc9900, 10, 28); // trading floor
+ptLight(16, 14, -15, 0x1a88cc, 10, 28);  // ops centre
+ptLight(-16, 14, 15, 0xcc2233, 9, 26);   // security
+ptLight(16, 14, 15, 0x18cc66, 9, 26);    // customer services
 // Corridor fills
-ptLight(0, 4, -14, 0x4466cc, 8, 20);
-ptLight(0, 4,  14, 0x4466cc, 8, 20);
-ptLight(-12, 4, 0, 0x2255aa, 7, 18);
-ptLight( 12, 4, 0, 0x2255aa, 7, 18);
+ptLight(0, 4, -14, 0x2244aa, 5, 20);
+ptLight(0, 4,  14, 0x2244aa, 5, 20);
+ptLight(-12, 4, 0, 0x1a3388, 4, 18);
+ptLight( 12, 4, 0, 0x1a3388, 4, 18);
 
-// Subtle cool hemi — sky blue top, dark navy ground
-const hemi = new THREE.HemisphereLight(0x334466, 0x0a0e18, 2.2);
+const hemi = new THREE.HemisphereLight(0x223355, 0x080c12, 1.5);
 scene.add(hemi);
 
 // Zone alert lights — start dark, turn red when incidents active
@@ -1026,9 +1022,9 @@ function getMat(color, emissive) {
     matCache.set(k, new THREE.MeshStandardMaterial({
       color: new THREE.Color(color),
       emissive: emissive ? new THREE.Color(emissive) : new THREE.Color(0),
-      emissiveIntensity: emissive ? 1.8 : 0,
+      emissiveIntensity: emissive ? 1.0 : 0,
       roughness: 0.65,
-      metalness: emissive ? 0.2 : 0,
+      metalness: emissive ? 0.1 : 0,
     }));
   }
   return matCache.get(k);
@@ -1126,7 +1122,7 @@ function makeNPC(x, y, z, role) {
     const mat = new THREE.MeshStandardMaterial({
       color: col, roughness: 0.8,
       emissive: em ? new THREE.Color(em) : undefined,
-      emissiveIntensity: em ? 0.7 : 0,
+      emissiveIntensity: em ? 0.5 : 0,
     });
     const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
     m.position.set(ox,oy,oz);
@@ -1250,7 +1246,7 @@ function makeIssueEnemy(x, y, z, type) {
     const mat = new THREE.MeshStandardMaterial({
       color: col, roughness: 0.35,
       emissive: em ? new THREE.Color(em) : undefined,
-      emissiveIntensity: em ? 1.0 : 0,
+      emissiveIntensity: em ? 0.7 : 0,
     });
     const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
     m.position.set(ox,oy,oz);
@@ -1408,7 +1404,7 @@ function b3(w,h,d,col,ox,oy,oz,em=0) {
     new THREE.MeshStandardMaterial({
       color: col,
       emissive: em ? new THREE.Color(em) : undefined,
-      emissiveIntensity: em ? 1.4 : 0,
+      emissiveIntensity: em ? 0.8 : 0,
       roughness: 0.6,
     }));
   m.position.set(ox,oy,oz);
@@ -1999,7 +1995,7 @@ function makeSlackbot(x, y, z) {
   const g = new THREE.Group();
   function p(w,h,d,col,ox,oy,oz,em=0) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
-      new THREE.MeshStandardMaterial({ color:col, emissive: em ? new THREE.Color(em):undefined, emissiveIntensity:em?1.0:0, roughness:0.6 }));
+      new THREE.MeshStandardMaterial({ color:col, emissive: em ? new THREE.Color(em):undefined, emissiveIntensity:em?0.7:0, roughness:0.6 }));
     m.position.set(ox,oy,oz);
     g.add(m);
     return m;
