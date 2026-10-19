@@ -6,28 +6,53 @@ import * as THREE from 'three';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const P = {
-  floorTile: 0xdde0e8, floorTile2: 0xc8ccd4, carpet: 0x2a1840, carpetLit: 0x3a2050,
-  wall: 0x3F0E40, wallTrim: 0x5a1a6a, ceiling: 0x1a0828,
-  glass: 0x4a9fd4, glassLit: 0x6bc4f0,
-  desk: 0x3d2812, deskTop: 0x5a3a18, chair: 0x1a1a2a,
-  server: 0x0d2240, serverLit: 0x1a3a58, serverFront: 0x0a1828,
+  // Floors
+  marbleDark: 0x14182a, marbleLight: 0x1e2438, marbleMid: 0x191e30,
+  goldInlay: 0x7a5e24, goldBright: 0xc49a38,
+  carpet: 0x180e28, carpetLit: 0x231540,
+  pcbBase: 0x0f1a08, pcbTrace: 0x1c2e10, pcbPad: 0x2e4818, pcbVia: 0x4a6820,
+  concrete: 0x1e2228, concreteDark: 0x14181e, concreteLight: 0x2c3240,
+  // Walls
+  wallBase: 0x0c1420, wallPanel: 0x111c2e, wallDark: 0x08101a,
+  wallAccent: 0x1c2c44, wall: 0x3F0E40, wallTrim: 0x5a1a6a,
+  steel: 0x2c3440, steelLight: 0x3c4a5a, steelDark: 0x1c2230,
+  // Glass
+  glass: 0x2a6080, glassBright: 0x4ab8d8, glassDim: 0x1a3848,
+  // Furniture/props
+  desk: 0x1a2030, deskTop: 0x242e40, deskLight: 0x2e3a50,
+  chair: 0x0e1420, chairSeat: 0x182030,
+  pot: 0x2a2a3a, wood: 0x4a3018,
+  // Server/tech
+  serverBody: 0x080e18, serverFace: 0x0c1422, serverCap: 0x141e2c,
   ledGreen: 0x00ff66, ledRed: 0xff2244, ledAmber: 0xffaa00, ledBlue: 0x00aaff,
-  screen: 0x002244, screenOn: 0x004488, screenGlow: 0x0066cc,
+  ledCyan: 0x00e5ff, ledWhite: 0xccddff,
+  screen: 0x04080e, screenOn: 0x06101c, screenGlow: 0x0a1830,
+  // Neon accents (emissive)
   neonBlue: 0x36C5F0, neonCyan: 0x00e5ff, neonGreen: 0x2EB67D,
   neonRed: 0xE01E5A, neonAmber: 0xECB22E, neonPurple: 0x8833ff,
+  neonMagenta: 0xff44cc, neonWhite: 0xddeeff,
   alertRed: 0xff0033, alertAmber: 0xff8800,
-  concreteLight: 0x5a5a70, concreteDark: 0x2a2a3a,
-  railing: 0x4a3060, railingTop: 0x36C5F0,
-  plant: 0x2a6a2a, plantDark: 0x1a4a1a, pot: 0xd9d4c7,
-  wood: 0x6b4423,
-  skyHigh: 0x0a0518, skyLow: 0x1a0a30, horizon: 0xff4400,
-  bldgA: 0x1a2035, bldgB: 0x15182a, bldgC: 0x1e1535,
+  // Railings
+  railing: 0x1c2a3c, railingTop: 0x36C5F0,
+  // Plants
+  plant: 0x1a4a18, plantDark: 0x112e10, plantLight: 0x2a6028,
+  // People
+  skin: 0xc68642, skinDark: 0x8d5524, skinLight: 0xe8b89a,
+  hairDark: 0x1a1008, hairBrown: 0x4a2810, hairBlond: 0xb89030,
+  // Sky/bg
+  skyHigh: 0x060a1a, skyLow: 0x0e1228, horizon: 0xcc3300,
+  bldgA: 0x0e1428, bldgB: 0x0c1020, bldgC: 0x12102a,
+  // NatWest brand (use sparingly as accents)
+  natwestRed: 0xda2035, natwestPurple: 0x3F0E40,
+  gold: 0xc49a38,
+  // Misc
   pathCyan: 0x28d9f2,
-  gold: 0xffc857,
-  skin: 0xc68642, hairDark: 0x2a1a08, hairBrown: 0x6b3a1a, hairBlond: 0xc8a040,
   shirt1: 0x36C5F0, shirt2: 0x3F0E40, shirt3: 0x2EB67D, shirt4: 0xECB22E,
   trousers: 0x1a1a30, shoes: 0x111122,
-  jacketPurple: 0x5a1a6a, natwestRed: 0xda2035,
+  jacketPurple: 0x5a1a6a,
+  // Alias backcompat
+  floorTile: 0x1e2438, floorTile2: 0x191e30, ceiling: 0x080c14,
+  wallBase2: 0x0c1420,
 };
 
 // ─── Voxel world ──────────────────────────────────────────────────────────────
@@ -131,19 +156,25 @@ function buildNatwestLogo(cx, y0, cz) {
 function buildCentralAtrium() {
   const W=24, D=20, CH=8;
 
-  // ── Floor — corporate white marble with brand-colour veining ──
-  for (let x = -W; x <= W; x++)
+  // ── FLOOR: dark marble tiles with gold inlay grid ──
+  for (let x = -W; x <= W; x++) {
     for (let z = -D; z <= D; z++) {
-      // Base marble: white with slight texture variation
-      const tone = ((x*3+z*7) & 7) < 2 ? 0xe0dce8 : 0xeceaf2;
-      setSolid(x, 1, z, tone);
+      const isGoldX = (x % 6 === 0);
+      const isGoldZ = (z % 6 === 0);
+      if (isGoldX && isGoldZ) {
+        setSolid(x, 1, z, P.goldBright);
+      } else if (isGoldX || isGoldZ) {
+        setSolid(x, 1, z, P.goldInlay);
+      } else {
+        const v = ((x * 7 + z * 11) & 7);
+        const col = v < 2 ? P.marbleDark : v < 5 ? P.marbleMid : P.marbleLight;
+        setSolid(x, 1, z, col);
+      }
     }
-  // Aubergine carpet in centre 7×7
-  fillFloor(-7, 7, -7, 7, 1, 0x3F0E40);
-  // Brand-colour cross inlaid in marble at FLOOR level (y=1, not raised)
-  for (let x = -23; x <= 23; x++) setSolid(x, 1, 0,  0x2a1040);
-  for (let z = -19; z <= 19; z++) setSolid(0, 1, z,  0x2a1040);
-  // Neon LED floor strips at FLOOR level (y=1) so they don't block walking
+  }
+  // Deep carpet inset at atrium centre
+  fillFloor(-5, 5, -5, 5, 1, P.carpet);
+  // LED floor ring (y=1 so it never blocks walking)
   for (let i = -8; i <= 8; i++) {
     setSolid(i,  1, -8, P.neonBlue, { emissive: P.neonBlue });
     setSolid(i,  1,  8, P.neonBlue, { emissive: P.neonBlue });
@@ -151,71 +182,97 @@ function buildCentralAtrium() {
     setSolid( 8, 1, i,  P.neonBlue, { emissive: P.neonBlue });
   }
 
-  // ── Outer walls — NatWest aubergine with panelling ──
-  fillBox(-W, 2, -D, -W, CH, D,   0x3F0E40);
-  fillBox( W, 2, -D,  W, CH, D,   0x3F0E40);
-  fillBox(-W, 2, -D,  W, CH, -D,  0x3F0E40);
-  fillBox(-W, 2,  D,  W, CH,  D,  0x3F0E40);
-  // Skirting board (darker strip at base of walls)
-  fillBox(-W, 2, -D,  W, 2, -D, 0x2a0830);
-  fillBox(-W, 2,  D,  W, 2,  D, 0x2a0830);
-  fillBox(-W, 2, -D, -W, 2,  D, 0x2a0830);
-  fillBox( W, 2, -D,  W, 2,  D, 0x2a0830);
-  // Cornice strip at top (lighter fascia)
-  fillBox(-W, 8, -D,  W, 8, -D, P.wallTrim);
-  fillBox(-W, 8,  D,  W, 8,  D, P.wallTrim);
-  fillBox(-W, 8, -D, -W, 8,  D, P.wallTrim);
-  fillBox( W, 8, -D,  W, 8,  D, P.wallTrim);
+  // ── OUTER WALLS: per-voxel dark navy with panels & glass ──
+  // North wall (z=-D)  — glass facade
+  for (let x = -W; x <= W; x++) {
+    for (let y = 2; y <= CH; y++) {
+      const wx = ((x + 24) % 5);
+      const glass = wx >= 1 && wx <= 3 && y >= 3 && y <= 7;
+      if (glass) {
+        setSolid(x, y, -D, P.glassBright, { emissive: 0x002244 });
+      } else if (wx === 0 || wx === 4) {
+        setSolid(x, y, -D, P.wallAccent, (y % 4 === 0) ? { emissive: P.neonBlue } : {});
+      } else {
+        const isPilH = (y % 4 === 0);
+        setSolid(x, y, -D, isPilH ? P.wallPanel : P.wallBase);
+      }
+    }
+  }
+  // South wall (z=D) — matching facade
+  for (let x = -W; x <= W; x++) {
+    for (let y = 2; y <= CH; y++) {
+      const wx = ((x + 24) % 5);
+      const glass = wx >= 1 && wx <= 3 && y >= 3 && y <= 7;
+      if (glass) {
+        setSolid(x, y, D, P.glassBright, { emissive: 0x002244 });
+      } else if (wx === 0 || wx === 4) {
+        setSolid(x, y, D, P.wallAccent, (y % 4 === 0) ? { emissive: P.neonBlue } : {});
+      } else {
+        const isPilH = (y % 4 === 0);
+        setSolid(x, y, D, isPilH ? P.wallPanel : P.wallBase);
+      }
+    }
+  }
+  // East wall (x=W)
+  for (let z = -D; z <= D; z++) {
+    for (let y = 2; y <= CH; y++) {
+      const pil = (z % 4 === 0) || (y % 4 === 0);
+      setSolid(W, y, z, pil ? P.wallAccent : P.wallBase,
+        (z % 4 === 0 && y % 4 === 0) ? { emissive: P.neonCyan } : {});
+    }
+  }
+  // West wall (x=-W)
+  for (let z = -D; z <= D; z++) {
+    for (let y = 2; y <= CH; y++) {
+      const pil = (z % 4 === 0) || (y % 4 === 0);
+      setSolid(-W, y, z, pil ? P.wallAccent : P.wallBase,
+        (z % 4 === 0 && y % 4 === 0) ? { emissive: P.neonBlue } : {});
+    }
+  }
+  // Skirting boards (darkest at wall base)
+  for (let x = -W+1; x < W; x++) { setSolid(x, 2, -D, P.wallDark); setSolid(x, 2, D, P.wallDark); }
+  for (let z = -D+1; z < D; z++) { setSolid(-W, 2, z, P.wallDark); setSolid(W, 2, z, P.wallDark); }
+  // Cornice LED strip at top of walls
+  for (let x = -W; x <= W; x++) {
+    setSolid(x, CH, -D, P.wallAccent, { emissive: P.neonBlue });
+    setSolid(x, CH,  D, P.wallAccent, { emissive: P.neonBlue });
+  }
+  for (let z = -D; z <= D; z++) {
+    setSolid(-W, CH, z, P.wallAccent, { emissive: P.neonBlue });
+    setSolid( W, CH, z, P.wallAccent, { emissive: P.neonBlue });
+  }
 
-  // ── Glass windows on facade walls ──
-  for (let x = -22; x <= 20; x += 5) {
-    fillBox(x, 3, -D, x+3, 7, -D, 0x4ab0d8);
-    fillBox(x, 3,  D, x+3, 7,  D, 0x4ab0d8);
+  // ── CEILING: coffered dark panels with LED grid ──
+  for (let x = -W; x <= W; x++) {
+    for (let z = -D; z <= D; z++) {
+      const cof = (x % 5 === 0) || (z % 5 === 0);
+      setSolid(x, CH+1, z, cof ? 0x0e1626 : 0x080c14);
+    }
   }
-  // Window frames (slightly lighter than wall)
-  for (let x = -22; x <= 20; x += 5) {
-    vox(x-1, 3, -D, P.wallTrim); vox(x+4, 3, -D, P.wallTrim);
-    vox(x-1, 7, -D, P.wallTrim); vox(x+4, 7, -D, P.wallTrim);
-    vox(x-1, 3,  D, P.wallTrim); vox(x+4, 3,  D, P.wallTrim);
-    vox(x-1, 7,  D, P.wallTrim); vox(x+4, 7,  D, P.wallTrim);
+  // LED ceiling grid beams (emissive strips)
+  for (let x = -20; x <= 20; x += 5) {
+    for (let z = -D+1; z <= D-1; z++) setSolid(x, CH, z, P.wallAccent, { emissive: P.neonBlue });
   }
-
-  // ── Ceiling — coffered panels with LED strips ──
-  for (let x = -W; x <= W; x++)
-    for (let z = -D; z <= D; z++)
-      setSolid(x, CH+1, z, ((x+z)%4===0) ? 0x1e0e30 : 0x1a0828);
-  // LED strips: main grid
-  for (let x = -20; x <= 20; x += 4) vox(x, CH, 0,  P.neonBlue, { emissive: P.neonBlue });
-  for (let z = -16; z <= 16; z += 4) vox(0,  CH, z, P.neonBlue, { emissive: P.neonBlue });
-  // Perimeter LED strip
-  for (let x = -22; x <= 22; x++) {
-    vox(x, CH, -18, P.neonPurple, { emissive: P.neonPurple });
-    vox(x, CH,  18, P.neonPurple, { emissive: P.neonPurple });
-  }
-  for (let z = -18; z <= 18; z++) {
-    vox(-22, CH, z, P.neonPurple, { emissive: P.neonPurple });
-    vox( 22, CH, z, P.neonPurple, { emissive: P.neonPurple });
+  for (let z = -16; z <= 16; z += 5) {
+    for (let x = -W+1; x <= W-1; x++) setSolid(x, CH, z, P.wallAccent, { emissive: P.neonBlue });
   }
 
-  // ── Columns — placed away from walkways ──
+  // ── COLUMNS — dark navy with neon caps ──
   const colPositions = [
-    [-18,-14], [-18,14], [18,-14], [18,14],
-    [-18,  0], [18,   0],
+    [-18,-14], [-18,14], [18,-14], [18,14], [-18,0], [18,0],
   ];
   colPositions.forEach(([cx,cz]) => buildColumn(cx, 2, cz, CH, P.neonBlue));
 
-  // ── Interior divider walls — with doorway openings at z=0 ──
-  fillBox(-24, 2, -8, -24, 7, 8, 0x3F0E40);
-  fillBox( 24, 2, -8,  24, 7, 8, 0x3F0E40);
-  fillBox(-8,  2, -20,  8, 7, -20, 0x3F0E40);
-  fillBox(-8,  2,  20,  8, 7,  20, 0x3F0E40);
-  // Left inner wall: split into north/south segments leaving a 3-wide doorway at z=0
-  fillBox(-8, 2, -12, -8, 7, -3, P.wallTrim);  // north segment
-  fillBox(-8, 2,   3, -8, 7, 12, P.wallTrim);  // south segment
-  // Right inner wall: same
-  fillBox( 8, 2, -12,  8, 7, -3, P.wallTrim);
-  fillBox( 8, 2,   3,  8, 7, 12, P.wallTrim);
-  // Door frame highlights around openings
+  // ── INNER DIVIDER WALLS (x=±8) with doorway at |z|<3 ──
+  for (let y = 2; y <= 7; y++) {
+    for (let z = -12; z <= 12; z++) {
+      if (Math.abs(z) < 3) continue; // leave doorway open
+      const ac = (y % 4 === 0 || z % 4 === 0);
+      setSolid(-8, y, z, ac ? P.wallAccent : P.wallPanel);
+      setSolid( 8, y, z, ac ? P.wallAccent : P.wallPanel);
+    }
+  }
+  // Door frame highlights
   for (let y = 2; y <= 5; y++) {
     vox(-8, y, -3, P.neonBlue, { emissive: P.neonBlue });
     vox(-8, y,  3, P.neonBlue, { emissive: P.neonBlue });
@@ -223,58 +280,69 @@ function buildCentralAtrium() {
     vox( 8, y,  3, P.neonBlue, { emissive: P.neonBlue });
   }
 
-  // ── NatWest cube logo on back wall ──
+  // ── NatWest logo on back wall ──
   buildNatwestLogo(0, 4, -19);
-  // Electric blue brand strip above logo
   fillBox(-8, 8, -19, 8, 8, -19, P.neonBlue, { emissive: P.neonBlue });
 
-  // ── Reception desk — L-shaped with screens ──
-  // Main desk face
-  fillBox(-5, 2, -13, 5, 2, -13, P.deskTop);
-  fillBox(-5, 2, -13, 5, 3, -13, 0x3d2812);
-  // Side wing
-  fillBox( 5, 2, -15,  5, 3, -13, 0x3d2812);
-  fillBox(-5, 2, -15, -5, 3, -13, 0x3d2812);
-  // Monitors (5 across)
-  for (let mx = -3; mx <= 3; mx += 2) {
-    vox(mx,   3, -13, P.screenOn, { emissive: mx === 1 ? P.neonRed : P.neonBlue });
-    vox(mx,   4, -13, P.screenOn, { emissive: mx === 1 ? P.neonRed : P.neonBlue });
+  // ── RECEPTION DESK — L-shaped with per-block detailing ──
+  for (let x = -5; x <= 5; x++) {
+    setSolid(x, 2, -13, P.deskTop);
+    setSolid(x, 3, -13, P.desk);
   }
-  // Desk lamp
+  for (let z = -15; z <= -13; z++) {
+    setSolid( 5, 2, z, P.deskTop); setSolid( 5, 3, z, P.desk);
+    setSolid(-5, 2, z, P.deskTop); setSolid(-5, 3, z, P.desk);
+  }
+  // Reception monitors
+  for (let mx = -3; mx <= 3; mx += 2) {
+    setSolid(mx, 3, -13, P.screenOn, { emissive: mx === 1 ? P.neonRed : P.neonBlue });
+    setSolid(mx, 4, -13, P.screenOn, { emissive: mx === 1 ? P.neonRed : P.neonBlue });
+  }
   vox(-4, 4, -13, P.neonAmber, { emissive: P.neonAmber });
   vox( 4, 4, -13, P.neonAmber, { emissive: P.neonAmber });
+  // Desk top surface detail — scattered neon pixel accents
+  for (const [dx,dz] of [[-3,-13],[-1,-13],[1,-13],[3,-13]]) {
+    setSolid(dx, 2, dz, P.deskLight);
+  }
 
-  // ── Floor directional arrow strips ──
+  // ── WAYFINDING floor arrows (raised voxels at y=2, not walkway level) ──
   for (let i = -5; i < 0; i++) vox(i, 2,  5, P.neonRed,   { emissive: P.neonRed   });
   for (let i = 0; i <= 5; i++) vox(i, 2,  5, P.neonAmber, { emissive: P.neonAmber });
   for (let i = -5; i < 0; i++) vox(i, 2, -5, P.neonGreen, { emissive: P.neonGreen });
   for (let i = 0; i <= 5; i++) vox(i, 2, -5, P.neonCyan,  { emissive: P.neonCyan  });
 
-  // ── Central SEV-1 emergency beacon pillar ──
-  fillBox(-1, 2, -1, 1, 4, 1, 0x3a0a40);
-  fillBox(-1, 4, -1, 1, 4, 1, 0x2a0028);
+  // ── SEV-1 emergency beacon pillar (hollow dark obelisk) ──
+  for (let y = 2; y <= 4; y++) {
+    for (const [ox,oz] of [[-1,-1],[0,-1],[1,-1],[-1,1],[0,1],[1,1],[-1,0],[1,0]]) {
+      setSolid(ox, y, oz, P.wallDark);
+    }
+  }
+  // Beacon crown
   vox( 0, 5, 0, P.natwestRed, { emissive: P.natwestRed });
   vox( 0, 6, 0, P.neonRed,    { emissive: P.neonRed    });
-  vox(-1, 5, 0, P.neonRed,    { emissive: P.neonRed    });
-  vox( 1, 5, 0, P.neonRed,    { emissive: P.neonRed    });
-  vox( 0, 5,-1, P.neonRed,    { emissive: P.neonRed    });
-  vox( 0, 5, 1, P.neonRed,    { emissive: P.neonRed    });
-
-  // ── Seating area (against the left wall, not blocking walkways) ──
-  for (const [sx,sz] of [[-21,-5],[-21,-3],[-19,-5],[-19,-3]]) {
-    setSolid(sx, 1, sz, P.carpet);  // carpet pad at floor level
-    vox(sx, 2, sz, 0x1a1040); // seat
-    vox(sx, 3, sz, 0x1a1040); // back
+  for (const [dx,dz] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+    vox(dx, 5, dz, P.neonRed, { emissive: P.neonRed });
   }
-  // Coffee table (floor-level surface)
-  vox(-20, 2, -4, P.deskTop);
 
-  // ── Info kiosks against right wall ──
+  // ── SEATING AREA (left wall, not blocking corridors) ──
+  for (const [sx,sz] of [[-21,-5],[-21,-3],[-19,-5],[-19,-3]]) {
+    setSolid(sx, 1, sz, P.carpet);
+    vox(sx, 2, sz, P.chairSeat);
+    vox(sx, 3, sz, P.chair);
+  }
+  vox(-20, 2, -4, P.deskLight);
+
+  // ── INFO KIOSKS (right wall) ──
   for (const [kx,kz] of [[21,-5],[21,5],[21,0]]) {
-    vox(kx, 2, kz, 0x1a1030);
+    vox(kx, 2, kz, P.desk);
     vox(kx, 3, kz, P.screenOn, { emissive: P.neonBlue });
     vox(kx, 4, kz, P.screenOn, { emissive: P.neonBlue });
     vox(kx, 5, kz, P.neonCyan, { emissive: P.neonCyan });
+  }
+  // Kiosk base panels
+  for (const [kx,kz] of [[21,-5],[21,5],[21,0]]) {
+    setSolid(kx-1, 2, kz, P.wallPanel);
+    setSolid(kx+1, 2, kz, P.wallPanel);
   }
 }
 
@@ -462,9 +530,9 @@ function buildDataCentre() {
 // Cloud & Infrastructure: x=14..24, z=12..20
 function buildCloudInfra() {
   fillFloor(13, 24, 10, 20, 1, P.floorTile2);
-  fillBox(24, 2, 10, 24, 8, 20, P.wall);
-  fillBox(13, 2, 20, 24, 8, 20, P.wall);
-  fillBox(13, 2, 10, 13, 8, 20, P.wallTrim);
+  fillBox(24, 2, 10, 24, 8, 20, P.wallBase);
+  fillBox(13, 2, 20, 24, 8, 20, P.wallBase);
+  fillBox(13, 2, 10, 13, 8, 20, P.wallPanel);
   fillFloor(13, 24, 10, 20, 9, P.ceiling);
   // Network switch rack
   fillBox(22, 2, 12, 23, 4, 12, P.server);
@@ -486,10 +554,10 @@ function buildCloudInfra() {
 // Payments: x=14..24, z=-12..-2
 function buildPayments() {
   fillFloor(13, 24, -12, -2, 1, P.carpet);
-  fillBox(24, 2, -12, 24, 8, -2, P.wall);
-  fillBox(13, 2, -12, 24, 8, -12, P.wall);
-  fillBox(13, 2, -2, 24, 8, -2, P.wallTrim);
-  fillBox(13, 2, -12, 13, 8, -2, P.wallTrim);
+  fillBox(24, 2, -12, 24, 8, -2, P.wallBase);
+  fillBox(13, 2, -12, 24, 8, -12, P.wallBase);
+  fillBox(13, 2, -2, 24, 8, -2, P.wallPanel);
+  fillBox(13, 2, -12, 13, 8, -2, P.wallPanel);
   fillFloor(13, 24, -12, -2, 9, P.ceiling);
   // Payment processing terminals (rows)
   for (let i = 0; i < 4; i++) {
@@ -514,14 +582,14 @@ function buildTradingFloor() {
 
   fillFloor(-24, -8, -20, -10, MEZ+5, P.ceiling);
   // Walls with panelling
-  fillBox(-24, MEZ+1, -20, -8,  MEZ+5, -20, P.wall);
-  fillBox(-24, MEZ+1, -10, -8,  MEZ+5, -10, P.wallTrim);
-  fillBox(-24, MEZ+1, -20, -24, MEZ+5, -10, P.wall);
-  fillBox(-8,  MEZ+1, -20, -8,  MEZ+5, -10, P.wallTrim);
+  fillBox(-24, MEZ+1, -20, -8,  MEZ+5, -20, P.wallBase);
+  fillBox(-24, MEZ+1, -10, -8,  MEZ+5, -10, P.wallPanel);
+  fillBox(-24, MEZ+1, -20, -24, MEZ+5, -10, P.wallBase);
+  fillBox(-8,  MEZ+1, -20, -8,  MEZ+5, -10, P.wallPanel);
   // Trim bands on walls
   for (let x = -23; x <= -9; x++) {
-    vox(x, MEZ+2, -20, P.wallTrim);
-    vox(x, MEZ+4, -20, P.wallTrim);
+    vox(x, MEZ+2, -20, P.wallAccent);
+    vox(x, MEZ+4, -20, P.wallAccent);
   }
   // Ceiling: ticker strip
   for (let x = -23; x <= -9; x += 2)
@@ -564,10 +632,10 @@ function buildTradingFloor() {
 function buildOperationsCentre() {
   fillFloor(8, 24, -20, -10, MEZ, P.floorTile);
   fillFloor(8, 24, -20, -10, MEZ+5, P.ceiling);
-  fillBox(8, MEZ+1, -20, 24, MEZ+5, -20, P.wall);
-  fillBox(8, MEZ+1, -10, 24, MEZ+5, -10, P.wallTrim);
-  fillBox(24, MEZ+1, -20, 24, MEZ+5, -10, P.wall);
-  fillBox(8, MEZ+1, -20, 8, MEZ+5, -10, P.wallTrim);
+  fillBox(8, MEZ+1, -20, 24, MEZ+5, -20, P.wallBase);
+  fillBox(8, MEZ+1, -10, 24, MEZ+5, -10, P.wallPanel);
+  fillBox(24, MEZ+1, -20, 24, MEZ+5, -10, P.wallBase);
+  fillBox(8, MEZ+1, -20, 8, MEZ+5, -10, P.wallPanel);
   // Big monitoring wall
   fillBox(9, MEZ+2, -19, 23, MEZ+4, -19, P.screen, { emissive: P.screenGlow });
   fillBox(10, MEZ+2, -19, 22, MEZ+4, -19, P.screenOn, { emissive: P.neonBlue });
@@ -590,10 +658,10 @@ function buildOperationsCentre() {
 function buildSecurity() {
   fillFloor(-24, -8, 10, 20, MEZ, P.floorTile2);
   fillFloor(-24, -8, 10, 20, MEZ+5, P.ceiling);
-  fillBox(-24, MEZ+1, 20, -8, MEZ+5, 20, P.wall);
-  fillBox(-24, MEZ+1, 10, -8, MEZ+5, 10, P.wallTrim);
-  fillBox(-24, MEZ+1, 10, -24, MEZ+5, 20, P.wall);
-  fillBox(-8, MEZ+1, 10, -8, MEZ+5, 20, P.wallTrim);
+  fillBox(-24, MEZ+1, 20, -8, MEZ+5, 20, P.wallBase);
+  fillBox(-24, MEZ+1, 10, -8, MEZ+5, 10, P.wallPanel);
+  fillBox(-24, MEZ+1, 10, -24, MEZ+5, 20, P.wallBase);
+  fillBox(-8, MEZ+1, 10, -8, MEZ+5, 20, P.wallPanel);
   // Security consoles
   for (let i = 0; i < 3; i++) {
     const x = -22 + i * 4;
@@ -616,10 +684,10 @@ function buildSecurity() {
 function buildCustomerServices() {
   fillFloor(8, 24, 10, 20, MEZ, P.carpet);
   fillFloor(8, 24, 10, 20, MEZ+5, P.ceiling);
-  fillBox(8, MEZ+1, 20, 24, MEZ+5, 20, P.wall);
-  fillBox(8, MEZ+1, 10, 24, MEZ+5, 10, P.wallTrim);
-  fillBox(24, MEZ+1, 10, 24, MEZ+5, 20, P.wall);
-  fillBox(8, MEZ+1, 10, 8, MEZ+5, 20, P.wallTrim);
+  fillBox(8, MEZ+1, 20, 24, MEZ+5, 20, P.wallBase);
+  fillBox(8, MEZ+1, 10, 24, MEZ+5, 10, P.wallPanel);
+  fillBox(24, MEZ+1, 10, 24, MEZ+5, 20, P.wallBase);
+  fillBox(8, MEZ+1, 10, 8, MEZ+5, 20, P.wallPanel);
   // Service desks
   for (let i = 0; i < 5; i++) {
     const x = 9 + (i % 3) * 4;
@@ -741,16 +809,16 @@ function addDetails() {
 
   // ── Mezzanine railing along atrium void ──
   for (let x = -7; x <= 7; x++) {
-    vox(x, MEZ+1, -9, 0x3a1850);
+    vox(x, MEZ+1, -9, P.railing);
     vox(x, MEZ+2, -9, P.neonBlue, { emissive: P.neonBlue });
-    vox(x, MEZ+1,  9, 0x3a1850);
+    vox(x, MEZ+1,  9, P.railing);
     vox(x, MEZ+2,  9, P.neonGreen, { emissive: P.neonGreen });
   }
   for (let z = -9; z <= 9; z++) {
-    vox(-7, MEZ+1, z, 0x3a1850);
-    vox(-7, MEZ+2, z, P.neonPurple, { emissive: P.neonPurple });
-    vox( 7, MEZ+1, z, 0x3a1850);
-    vox( 7, MEZ+2, z, P.neonPurple, { emissive: P.neonPurple });
+    vox(-7, MEZ+1, z, P.railing);
+    vox(-7, MEZ+2, z, P.neonCyan, { emissive: P.neonCyan });
+    vox( 7, MEZ+1, z, P.railing);
+    vox( 7, MEZ+2, z, P.neonCyan, { emissive: P.neonCyan });
   }
 
   // ── Extra detail in zone corridors ──
@@ -810,15 +878,15 @@ function buildCRAC(x, baseY, z) {
   setSolid(x, baseY+4, z, 0x0c2040);
 }
 
-// Column / pillar (1×1 footprint, decorative — aubergine base, neon cap)
+// Column / pillar (1×1 footprint) — dark navy base, emissive cap
 function buildColumn(x, baseY, z, h, capColor) {
   for (let y = 0; y < h; y++) {
-    setSolid(x, baseY + y, z,
-      y === 0        ? 0x2a0a30 :
-      y === h-1      ? capColor  :
-      y % 4 === 0    ? P.wallTrim :
-                       P.wall,
-      y === h-1 ? { emissive: capColor } : {});
+    const col = y === 0     ? P.wallDark   :
+                y === h-1   ? capColor     :
+                y % 4 === 0 ? P.wallAccent : P.wallPanel;
+    setSolid(x, baseY + y, z, col,
+      y === h-1     ? { emissive: capColor } :
+      y % 4 === 0   ? { emissive: P.neonBlue } : {});
   }
 }
 
@@ -879,11 +947,11 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 2.2;
+renderer.toneMappingExposure = 1.8;
 document.getElementById('renderer-container').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x2a1060, 60, 140);
+scene.fog = new THREE.Fog(0x060c18, 55, 130);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
 
@@ -896,10 +964,10 @@ window.addEventListener('resize', resizeRenderer);
 resizeRenderer();
 
 // ─── Lights ───────────────────────────────────────────────────────────────────
-const ambient = new THREE.AmbientLight(0xd0c8ff, 5.5);
+const ambient = new THREE.AmbientLight(0x9ab0cc, 4.5);
 scene.add(ambient);
 
-const sun = new THREE.DirectionalLight(0xfff4e0, 3.5);
+const sun = new THREE.DirectionalLight(0xe8f0ff, 2.8);
 sun.position.set(15, 40, 20);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
@@ -909,8 +977,8 @@ sun.shadow.camera.left = sun.shadow.camera.bottom = -40;
 sun.shadow.camera.right = sun.shadow.camera.top = 40;
 scene.add(sun);
 
-// Fill light from opposite direction so shadows aren't pitch black
-const fillLight = new THREE.DirectionalLight(0x80a0ff, 1.5);
+// Cool blue fill light
+const fillLight = new THREE.DirectionalLight(0x4488cc, 1.2);
 fillLight.position.set(-10, 20, -15);
 scene.add(fillLight);
 
@@ -920,24 +988,25 @@ function ptLight(x, y, z, color, intensity, dist) {
   scene.add(l);
   return l;
 }
-// Atrium lights — very bright
-ptLight(0, 8, 0, 0xaa66ff, 20, 35);
-ptLight(0, 3, 0, 0x36C5F0, 14, 26);
-// Zone fills — cranked up
-ptLight(-19, 5, -15, 0x22aaff, 18, 28);  // data centre
-ptLight(18, 5, 15, 0x00e5ff, 16, 26);    // cloud
-ptLight(18, 5, -7, 0xffaa00, 16, 24);    // payments
-ptLight(-16, 14, -15, 0xffcc00, 18, 28); // trading floor
-ptLight(16, 14, -15, 0x22aaff, 18, 28);  // ops centre
-ptLight(-16, 14, 15, 0xff2244, 16, 26);  // security
-ptLight(16, 14, 15, 0x22ff88, 16, 26);   // customer services
+// Atrium — cool blue, not purple
+ptLight(0, 8, 0, 0x2244aa, 18, 36);
+ptLight(0, 3, 0, 0x36C5F0, 14, 28);
+// Zone fills
+ptLight(-19, 5, -15, 0x22aaff, 16, 28);  // data centre
+ptLight(18, 5, 15, 0x00e5ff, 14, 26);    // cloud
+ptLight(18, 5, -7, 0xffaa00, 14, 24);    // payments
+ptLight(-16, 14, -15, 0xffcc00, 16, 28); // trading floor
+ptLight(16, 14, -15, 0x22aaff, 16, 28);  // ops centre
+ptLight(-16, 14, 15, 0xff3344, 14, 26);  // security
+ptLight(16, 14, 15, 0x22ff88, 14, 26);   // customer services
 // Corridor fills
-ptLight(0, 4, -14, 0x7799ff, 10, 20);
-ptLight(0, 4,  14, 0x7799ff, 10, 20);
-ptLight(-12, 4, 0, 0xaa66ff, 8, 18);
-ptLight( 12, 4, 0, 0xaa66ff, 8, 18);
+ptLight(0, 4, -14, 0x4466cc, 8, 20);
+ptLight(0, 4,  14, 0x4466cc, 8, 20);
+ptLight(-12, 4, 0, 0x2255aa, 7, 18);
+ptLight( 12, 4, 0, 0x2255aa, 7, 18);
 
-const hemi = new THREE.HemisphereLight(0x8866ff, 0x4422aa, 3.0);
+// Subtle cool hemi — sky blue top, dark navy ground
+const hemi = new THREE.HemisphereLight(0x334466, 0x0a0e18, 2.2);
 scene.add(hemi);
 
 // Zone alert lights — start dark, turn red when incidents active
@@ -1332,7 +1401,7 @@ function spawnNPCs() {
   makeIssueEnemy(-16, MEZ+4, -15,  'memLeak');   // trading floor — Memory Leak
 }
 
-// ─── Player character (tech engineer — headphones, glowing vest) ──────────────
+// ─── Player character (PipeCraft-style chunky tech engineer) ──────────────────
 const playerMesh = new THREE.Group();
 function b3(w,h,d,col,ox,oy,oz,em=0) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
@@ -1346,42 +1415,67 @@ function b3(w,h,d,col,ox,oy,oz,em=0) {
   playerMesh.add(m);
   return m;
 }
-// Body — purple/blue tech jacket
-b3(0.75,0.90,0.52, 0x3d1a6e, 0, 0.45, 0);
-// Jacket lapels
-b3(0.18,0.55,0.1, 0x2a1250, -0.2, 0.5, 0.27);
-b3(0.18,0.55,0.1, 0x2a1250,  0.2, 0.5, 0.27);
-// Chest panel (glowing tech display)
-b3(0.38,0.38,0.08, 0x0e1a40, 0, 0.56, 0.29);
-b3(0.26,0.26,0.08, P.neonCyan, 0, 0.58, 0.30, P.neonCyan);  // glowing circle
-// Chest buttons row
-b3(0.1,0.08,0.06, P.neonAmber, -0.12, 0.38, 0.29, P.neonAmber);
-b3(0.1,0.08,0.06, P.neonGreen,  0.0,  0.38, 0.29, P.neonGreen);
-b3(0.1,0.08,0.06, P.neonRed,    0.12, 0.38, 0.29, P.neonRed);
-// NatWest back logo
-b3(0.38,0.22,0.06, P.natwestRed, 0, 0.6, -0.28, P.natwestRed);
-// Head
-b3(0.68,0.68,0.68, P.skin, 0, 1.14, 0);
-// Hair (dark brown)
-b3(0.70,0.22,0.70, 0x3a1a08, 0, 1.47, 0);
-// Eyes
-b3(0.14,0.13,0.06, 0x111122, -0.16, 1.14, 0.35);
-b3(0.14,0.13,0.06, 0x111122,  0.16, 1.14, 0.35);
-// Headphone cups — cyan glow (matches image 3)
-b3(0.12,0.38,0.38, 0x1a55cc, -0.45, 1.16, 0, 0x2266ee);
-b3(0.12,0.38,0.38, 0x1a55cc,  0.45, 1.16, 0, 0x2266ee);
-// Headphone band over top
-b3(0.80,0.10,0.10, 0x223388, 0, 1.54, 0);
-// Legs
-const plLegL = b3(0.30,0.54,0.30, 0x1a1a38, -0.21, -0.27, 0);
-const plLegR = b3(0.30,0.54,0.30, 0x1a1a38,  0.21, -0.27, 0);
-b3(0.26,0.16,0.32, 0x111122, -0.21, -0.58, 0.05);
-b3(0.26,0.16,0.32, 0x111122,  0.21, -0.58, 0.05);
-// Arms — blue/purple
-const plArmL = b3(0.26,0.58,0.26, 0x2244aa, -0.53, 0.40, 0);
-const plArmR = b3(0.26,0.58,0.26, 0x2244aa,  0.53, 0.40, 0);
-// Tablet in right hand (glowing)
-b3(0.38,0.28,0.05, P.neonBlue, 0.68, 0.48, 0.14, P.neonBlue);
+// Chunky body — dark navy hoodie
+b3(0.90,0.95,0.58, 0x1a2a5a, 0, 0.42, 0);
+// Hoodie front panel (darker insert for text area)
+b3(0.58,0.52,0.10, 0x0e1838, 0, 0.44, 0.31);
+// "BUG" text pixels on chest (emissive neon)
+b3(0.10,0.08,0.07, P.neonCyan,  -0.20, 0.62, 0.33, P.neonCyan);
+b3(0.10,0.08,0.07, P.neonCyan,  -0.08, 0.62, 0.33, P.neonCyan);
+b3(0.10,0.08,0.07, P.neonCyan,   0.04, 0.62, 0.33, P.neonCyan);
+b3(0.10,0.08,0.07, P.neonGreen,  0.16, 0.62, 0.33, P.neonGreen);
+// Status indicator circle
+b3(0.24,0.24,0.08, P.neonAmber, 0.22, 0.40, 0.31, P.neonAmber);
+// Kangaroo pocket
+b3(0.42,0.22,0.09, 0x0e1830, 0, 0.22, 0.32);
+// Pocket LED strip
+b3(0.38,0.06,0.08, P.neonBlue, 0, 0.32, 0.32, P.neonBlue);
+// NatWest back logo strip
+b3(0.52,0.18,0.07, P.natwestRed, 0, 0.62, -0.31, P.natwestRed);
+// Chunky head — large square proportions
+b3(0.82,0.82,0.82, P.skin, 0, 1.16, 0);
+// Hair — thick dark cap
+b3(0.84,0.26,0.84, 0x2a1808, 0, 1.52, 0);
+// Side hair panels
+b3(0.10,0.32,0.86, 0x2a1808, -0.46, 1.32, 0);
+b3(0.10,0.32,0.86, 0x2a1808,  0.46, 1.32, 0);
+// Big rectangular glasses spanning the face
+b3(0.72,0.20,0.09, 0x111844, 0, 1.14, 0.44);
+// Lens tint (slightly lighter)
+b3(0.28,0.16,0.08, 0x1a2466, -0.18, 1.14, 0.45);
+b3(0.28,0.16,0.08, 0x1a2466,  0.18, 1.14, 0.45);
+// Glasses nose bridge
+b3(0.04,0.12,0.08, 0x222266, 0, 1.14, 0.44);
+// Eyes (visible behind glasses)
+b3(0.18,0.14,0.05, 0x001133, -0.18, 1.14, 0.45);
+b3(0.18,0.14,0.05, 0x001133,  0.18, 1.14, 0.45);
+// Headphone cups — large, glowing cyan
+b3(0.14,0.50,0.50, 0x1a44aa, -0.52, 1.18, 0, 0x2255cc);
+b3(0.14,0.50,0.50, 0x1a44aa,  0.52, 1.18, 0, 0x2255cc);
+// Headphone band (thick arc over top)
+b3(1.00,0.14,0.12, 0x1a2a6a, 0, 1.60, 0);
+// Chunky arms
+const plArmL = b3(0.34,0.66,0.34, 0x1a2a5a, -0.66, 0.40, 0);
+const plArmR = b3(0.34,0.66,0.34, 0x1a2a5a,  0.66, 0.40, 0);
+// Gloves/cuffs
+b3(0.32,0.24,0.32, 0x0e1020, -0.66, 0.04, 0.04);
+b3(0.32,0.24,0.32, 0x0e1020,  0.66, 0.04, 0.04);
+// Cuff neon stripe
+b3(0.34,0.06,0.34, P.neonCyan, -0.66, 0.17, 0.04, P.neonCyan);
+b3(0.34,0.06,0.34, P.neonCyan,  0.66, 0.17, 0.04, P.neonCyan);
+// Chunky legs
+const plLegL = b3(0.38,0.60,0.38, 0x141430, -0.24, -0.28, 0);
+const plLegR = b3(0.38,0.60,0.38, 0x141430,  0.24, -0.28, 0);
+// Thick boots
+b3(0.38,0.22,0.48, 0x0a0a18, -0.24, -0.63, 0.06);
+b3(0.38,0.22,0.48, 0x0a0a18,  0.24, -0.63, 0.06);
+// Boot sole neon stripe
+b3(0.40,0.07,0.50, P.neonBlue, -0.24, -0.75, 0.06, P.neonBlue);
+b3(0.40,0.07,0.50, P.neonBlue,  0.24, -0.75, 0.06, P.neonBlue);
+// Tech scanner tool in right hand
+b3(0.13,0.65,0.13, 0x2a3a5a, 0.94, 0.30, 0.12);
+b3(0.30,0.30,0.20, P.neonCyan, 0.94, 0.66, 0.14, P.neonCyan);
+b3(0.07,0.16,0.26, P.neonGreen, 0.94, 0.40, 0.24, P.neonGreen);
 scene.add(playerMesh);
 
 // ─── Player physics & camera ──────────────────────────────────────────────────
