@@ -129,10 +129,16 @@
 
   /* ── Interact prompt ── */
   #interact-prompt {
-    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
-    font-size: 12px; color: #ECB22E; letter-spacing: 1px;
-    background: rgba(9,8,23,0.8); padding: 5px 14px; border-radius: 3px;
-    border: 1px solid rgba(236,178,46,0.4); display: none; z-index: 30;
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    font-size: 15px; font-weight: bold; color: #fff; letter-spacing: 2px;
+    background: rgba(224,30,90,0.92); padding: 9px 22px; border-radius: 5px;
+    border: 2px solid #ECB22E; display: none; z-index: 30;
+    box-shadow: 0 0 18px rgba(224,30,90,0.7);
+    animation: promptPulse 1s ease-in-out infinite alternate;
+  }
+  @keyframes promptPulse {
+    from { transform: translateX(-50%) scale(1); }
+    to   { transform: translateX(-50%) scale(1.04); }
   }
 
   /* ── Evidence panel ── */

@@ -976,7 +976,7 @@ document.addEventListener('mousemove', e => {
 function movePlayer(dt) {
   // Mouse look
   const SENS = 0.002;
-  player.yaw   -= mouseDX * SENS;
+  player.yaw   += mouseDX * SENS;
   player.pitch  = Math.max(-0.6, Math.min(1.1, player.pitch - mouseDY * SENS));
   mouseDX = 0; mouseDY = 0;
 
@@ -1041,8 +1041,8 @@ function movePlayer(dt) {
     player.onGround = false;
   }
 
-  // Update player mesh — face movement direction when moving, else face camera yaw
-  playerMesh.position.set(player.x, player.y, player.z);
+  // Update player mesh — offset +0.66 so feet sit on the floor surface, not inside it
+  playerMesh.position.set(player.x, player.y + 0.66, player.z);
   if (moving) {
     const targetFace = Math.atan2(nx, nz);
     // Smooth rotation towards movement direction
@@ -1352,6 +1352,65 @@ function addLabel(text, x, y, z, color) {
   return s;
 }
 
+// ─── Slackbot markers — one above each incident ───────────────────────────────
+// Design matches the Slack brand: four-quadrant body in Slack colors (#36C5F0 / #2EB67D / #E01E5A / #ECB22E)
+const slackbotMarkers = []; // { g, objId, baseY }
+
+function makeSlackbot(x, y, z) {
+  const g = new THREE.Group();
+  function p(w,h,d,col,ox,oy,oz,em=0) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+      new THREE.MeshStandardMaterial({ color:col, emissive: em ? new THREE.Color(em):undefined, emissiveIntensity:em?1.0:0, roughness:0.6 }));
+    m.position.set(ox,oy,oz);
+    g.add(m);
+    return m;
+  }
+  // ── Body (four Slack-color quadrants) ──
+  p(0.5, 0.55, 0.55, 0x36C5F0, -0.26, 0.27, 0);   // top-left: Slack blue
+  p(0.5, 0.55, 0.55, 0x2EB67D,  0.26, 0.27, 0);   // top-right: Slack green
+  p(0.5, 0.55, 0.55, 0xE01E5A, -0.26,-0.27, 0);   // bot-left: Slack red
+  p(0.5, 0.55, 0.55, 0xECB22E,  0.26,-0.27, 0);   // bot-right: Slack amber
+  // White cross divider
+  p(0.12, 1.12, 0.58, 0xffffff, 0, 0, 0.01);      // vertical
+  p(1.12, 0.12, 0.58, 0xffffff, 0, 0, 0.01);      // horizontal
+  // ── Head ──
+  p(0.88, 0.72, 0.72, 0x36C5F0, 0, 0.92, 0);      // teal head
+  p(0.90, 0.18, 0.74, 0x1a0a2a, 0, 1.27, 0);      // dark hair/top
+  // Eyes
+  p(0.18, 0.18, 0.12, 0x1a0a2a, -0.20, 0.95, 0.37);
+  p(0.18, 0.18, 0.12, 0x1a0a2a,  0.20, 0.95, 0.37);
+  // Smile
+  p(0.30, 0.10, 0.10, 0x1a0a2a, 0, 0.72, 0.38);
+  // ── Stubby arms ──
+  p(0.28, 0.50, 0.30, 0xECB22E, -0.72, 0.05, 0);  // left arm
+  p(0.28, 0.50, 0.30, 0xECB22E,  0.72, 0.05, 0);  // right arm
+  // ── Chunky legs ──
+  p(0.36, 0.46, 0.36, 0xECB22E, -0.23, -0.78, 0);
+  p(0.36, 0.46, 0.36, 0xECB22E,  0.23, -0.78, 0);
+  // ── Alert "!" above head ──
+  p(0.14, 0.40, 0.14, 0xe01e5a, 0, 1.72, 0, 0xe01e5a);  // exclamation bar
+  p(0.14, 0.14, 0.14, 0xe01e5a, 0, 2.05, 0, 0xe01e5a);  // exclamation dot
+
+  g.position.set(x, y, z);
+  scene.add(g);
+  return g;
+}
+
+function spawnSlackbots() {
+  // One Slackbot per objective — position is above the objective location
+  const defs = [
+    { id: 'beacon',     x:  0,  y: 9,        z:  0  },
+    { id: 'datacenter', x: -19, y: 6,        z: -15 },
+    { id: 'cloud',      x:  18, y: 6,        z:  15 },
+    { id: 'payments',   x:  19, y: 6,        z:  -7 },
+    { id: 'ops',        x:  16, y: MEZ + 7,  z: -14 },
+  ];
+  defs.forEach(({ id, x, y, z }) => {
+    const g = makeSlackbot(x, y, z);
+    slackbotMarkers.push({ g, id, baseY: y, phase: Math.random() * Math.PI * 2 });
+  });
+}
+
 // ─── Main loop ────────────────────────────────────────────────────────────────
 function tick(now) {
   requestAnimationFrame(tick);
@@ -1408,6 +1467,17 @@ function tick(now) {
     mat.emissiveIntensity = 0.6 + Math.sin(t * 3.5 + phase) * 0.5;
   });
 
+  // Slackbot markers — bob + spin; hide when incident resolved
+  slackbotMarkers.forEach(({ g, id, baseY, phase }) => {
+    const obj = objectives.find(o => o.id === id);
+    const resolved = obj && obj.done;
+    g.visible = !resolved;
+    if (!resolved) {
+      g.position.y = baseY + Math.sin(t * 1.6 + phase) * 0.35;
+      g.rotation.y += 0.03;
+    }
+  });
+
   // Alert pulsing
   alertMats.forEach(({ m, mat, phase }) => {
     mat.emissiveIntensity = 0.7 + Math.sin(t * 4 + phase) * 0.7;
@@ -1430,6 +1500,7 @@ buildWorld();
 buildInstancedMeshes();
 buildSky();
 spawnNPCs();
+spawnSlackbots();
 
 // Alert decor beacons
 addAlertDecor(-1, 4, -1);      // central atrium beacon
