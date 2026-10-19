@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEV-1: Save the Bank</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #090817; overflow: hidden; font-family: 'Courier New', monospace; color: #fff; }
+  #canvas { display: block; image-rendering: pixelated; }
+
+  /* HUD */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 14px; background: rgba(9,8,23,0.88);
+    border-bottom: 2px solid #3F0E40; z-index: 10; flex-wrap: wrap;
+  }
+  .hud-block { display: flex; flex-direction: column; align-items: center; min-width: 70px; }
+  .hud-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #888; }
+  .hud-value { font-size: 16px; font-weight: bold; }
+  .hud-sep { width: 1px; height: 36px; background: #3F0E40; }
+  #timer-val { color: #ECB22E; }
+  #score-val { color: #36C5F0; }
+  #health-bar-wrap { display: flex; align-items: center; gap: 6px; }
+  #health-bar { width: 80px; height: 10px; background: #1a1030; border: 1px solid #3F0E40; border-radius: 3px; overflow: hidden; }
+  #health-fill { height: 100%; background: #2EB67D; transition: width 0.3s, background 0.3s; }
+  #incident-label { font-size: 10px; color: #E01E5A; text-transform: uppercase; letter-spacing: 1px; }
+  #incident-text { font-size: 12px; color: #fff; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #hint-btn {
+    margin-left: auto; padding: 5px 12px; background: #3F0E40; border: 1px solid #36C5F0;
+    color: #36C5F0; font-family: inherit; font-size: 11px; cursor: pointer; border-radius: 3px; letter-spacing: 1px;
+  }
+  #hint-btn:hover { background: #36C5F0; color: #090817; }
+
+  /* Overlay panels */
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(9,8,23,0.92); z-index: 100;
+  }
+  .panel {
+    background: #120d2a; border: 2px solid #3F0E40; border-radius: 8px;
+    padding: 32px 40px; max-width: 520px; width: 90%; text-align: center;
+  }
+  .panel h1 { font-size: 28px; color: #E01E5A; letter-spacing: 2px; margin-bottom: 4px; }
+  .panel h2 { font-size: 18px; color: #36C5F0; margin-bottom: 16px; letter-spacing: 1px; }
+  .panel p { color: #aaa; font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
+  .panel ul { text-align: left; color: #ccc; font-size: 12px; line-height: 2; margin-bottom: 20px; list-style: none; }
+  .panel ul li::before { content: "▶  "; color: #36C5F0; }
+  .btn {
+    display: inline-block; padding: 10px 28px; background: #E01E5A; color: #fff;
+    font-family: inherit; font-size: 14px; font-weight: bold; letter-spacing: 2px;
+    border: none; border-radius: 4px; cursor: pointer; text-transform: uppercase;
+  }
+  .btn:hover { background: #ff2d6e; }
+  .btn-green { background: #2EB67D; }
+  .btn-green:hover { background: #3dcf8e; }
+  .btn-blue { background: #36C5F0; color: #090817; }
+  .btn-blue:hover { background: #5cd5ff; }
+
+  /* Dialog box */
+  #dialog {
+    position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);
+    width: min(600px, 94vw); background: #120d2a; border: 2px solid #36C5F0;
+    border-radius: 6px; padding: 14px 20px; z-index: 50; display: none;
+  }
+  #dialog-who { font-size: 10px; color: #36C5F0; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  #dialog-text { font-size: 13px; color: #fff; line-height: 1.5; }
+  #dialog-action { margin-top: 10px; font-size: 11px; color: #ECB22E; }
+
+  /* Evidence panel */
+  #evidence-panel {
+    position: fixed; right: 14px; top: 60px; width: 200px;
+    background: rgba(9,8,23,0.88); border: 1px solid #3F0E40; border-radius: 6px;
+    padding: 10px; z-index: 10; display: none;
+  }
+  #evidence-panel h3 { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin-bottom: 8px; }
+  .ev-item { font-size: 11px; color: #ECB22E; padding: 3px 0; border-bottom: 1px solid #1a1030; }
+
+  /* Notification toast */
+  #toast {
+    position: fixed; top: 60px; left: 50%; transform: translateX(-50%);
+    background: #2EB67D; color: #090817; font-size: 13px; font-weight: bold;
+    padding: 8px 20px; border-radius: 4px; z-index: 200; display: none;
+    letter-spacing: 1px;
+  }
+
+  /* Interaction prompt */
+  #interact-prompt {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: #ECB22E; letter-spacing: 1px;
+    background: rgba(9,8,23,0.7); padding: 4px 12px; border-radius: 3px;
+    display: none; z-index: 10;
+  }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-block">
+    <span class="hud-label">Timer</span>
+    <span class="hud-value" id="timer-val">5:00</span>
+  </div>
+  <div class="hud-sep"></div>
+  <div class="hud-block">
+    <span class="hud-label">Score</span>
+    <span class="hud-value" id="score-val">0</span>
+  </div>
+  <div class="hud-sep"></div>
+  <div class="hud-block">
+    <span class="hud-label">Bank Health</span>
+    <div id="health-bar-wrap">
+      <div id="health-bar"><div id="health-fill" style="width:100%"></div></div>
+      <span id="health-pct" style="font-size:12px;color:#2EB67D">100%</span>
+    </div>
+  </div>
+  <div class="hud-sep"></div>
+  <div class="hud-block" style="align-items:flex-start">
+    <span class="hud-label" id="incident-label">Active Incident</span>
+    <span class="hud-value" id="incident-text" style="font-size:12px">—</span>
+  </div>
+  <button id="hint-btn">H — Hint</button>
+</div>
+
+<!-- Evidence panel -->
+<div id="evidence-panel">
+  <h3>Evidence Collected</h3>
+  <div id="evidence-list"></div>
+</div>
+
+<!-- Dialog -->
+<div id="dialog">
+  <div id="dialog-who"></div>
+  <div id="dialog-text"></div>
+  <div id="dialog-action">[E] Continue</div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Interact prompt -->
+<div id="interact-prompt"></div>
+
+<!-- Title screen overlay -->
+<div class="overlay" id="title-overlay">
+  <div class="panel">
+    <h1>SEV-1</h1>
+    <h2>SAVE THE BANK</h2>
+    <p>A critical banking service is down. You are the incident responder.<br>
+    Explore, investigate, diagnose and fix before customers feel the impact.</p>
+    <ul>
+      <li>WASD / Arrow Keys — Move</li>
+      <li>E — Interact</li>
+      <li>H — AI Hint</li>
+      <li>P / Esc — Pause</li>
+    </ul>
+    <button class="btn" id="start-btn">START MISSION</button>
+  </div>
+</div>
+
+<!-- Pause overlay -->
+<div class="overlay" id="pause-overlay" style="display:none">
+  <div class="panel">
+    <h2>PAUSED</h2>
+    <p>Take a breath. The bank needs you back soon.</p>
+    <button class="btn btn-blue" id="resume-btn">RESUME</button>
+  </div>
+</div>
+
+<!-- End overlay -->
+<div class="overlay" id="end-overlay" style="display:none">
+  <div class="panel" id="end-panel">
+    <h1 id="end-grade">S</h1>
+    <h2 id="end-title">SEV-1 CHAMPION</h2>
+    <p id="end-summary"></p>
+    <p id="end-score" style="color:#36C5F0;font-size:20px;margin:12px 0"></p>
+    <button class="btn btn-green" id="replay-btn">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>

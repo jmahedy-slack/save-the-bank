@@ -1,0 +1,11 @@
+{
+  "name": "savethebank",
+  "version": "1.0.0",
+  "description": "SEV-1: Save the Bank — NatWest Engineering Arcade",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=20" },
+  "license": "MIT"
+}
