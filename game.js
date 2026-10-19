@@ -7,10 +7,10 @@ import * as THREE from 'three';
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const P = {
   floorTile: 0xdde0e8, floorTile2: 0xc8ccd4, carpet: 0x2a1840, carpetLit: 0x3a2050,
-  wall: 0x2a1a38, wallTrim: 0x4a2860, ceiling: 0x1a1028,
+  wall: 0x3d2a55, wallTrim: 0x6a3a88, ceiling: 0x28184a,
   glass: 0x4a9fd4, glassLit: 0x6bc4f0,
   desk: 0x3d2812, deskTop: 0x5a3a18, chair: 0x1a1a2a,
-  server: 0x0d1f30, serverLit: 0x163348, serverFront: 0x0a1520,
+  server: 0x0d2240, serverLit: 0x1a3a58, serverFront: 0x0a1828,
   ledGreen: 0x00ff66, ledRed: 0xff2244, ledAmber: 0xffaa00, ledBlue: 0x00aaff,
   screen: 0x002244, screenOn: 0x004488, screenGlow: 0x0066cc,
   neonBlue: 0x36C5F0, neonCyan: 0x00e5ff, neonGreen: 0x2EB67D,
@@ -134,14 +134,23 @@ function buildCentralAtrium() {
   fillBox( 8, 2, -12,  8, 7, 12, P.wallTrim);
   fillBox(-12, 2, -8, 12, 2, -8, P.wallTrim);
   fillBox(-12, 2,  8, 12, 2,  8, P.wallTrim);
-  // NatWest signage on wall
+  // NatWest signage on wall — big glowing sign
   fillBox(-6, 6, -19, 6, 8, -19, P.wall);
-  fillBox(-4, 7, -19, 4, 7, -19, P.natwestRed, { emissive: P.natwestRed });
-  // Central cube installation
-  fillBox(-2, 2, -2, 2, 4, 2, P.neonBlue, { emissive: P.neonBlue });
-  fillBox(-1, 5, -1, 1, 5, 1, P.neonPurple, { emissive: P.neonPurple });
+  fillBox(-5, 7, -19, 5, 8, -19, P.natwestRed, { emissive: P.natwestRed });
+  fillBox(-3, 6, -19, 3, 6, -19, 0xff6688, { emissive: 0xff6688 });
+  // Central holographic cube installation (bright cyan like the ref)
+  fillBox(-2, 2, -2, 2, 5, 2, P.neonBlue, { emissive: P.neonBlue });
+  fillBox(-1, 6, -1, 1, 6, 1, P.neonCyan, { emissive: P.neonCyan });
+  vox(0, 7, 0, 0xffffff, { emissive: 0xffffff });
   // Alert beacon at centre
-  vox(0, 5, 0, P.neonRed, { emissive: P.neonRed });
+  vox(0, 8, 0, P.neonRed, { emissive: P.neonRed });
+  // Atrium floor neon grid
+  for (let i = -7; i <= 7; i++) {
+    vox(i, 2, -7, P.neonPurple, { emissive: P.neonPurple });
+    vox(i, 2,  7, P.neonPurple, { emissive: P.neonPurple });
+    vox(-7, 2, i, P.neonBlue,   { emissive: P.neonBlue });
+    vox( 7, 2, i, P.neonBlue,   { emissive: P.neonBlue });
+  }
 }
 
 // Data Centre: x=-24..-16, z=-20..-12
@@ -169,8 +178,19 @@ function buildDataCentre() {
     fillBox(x, 2, -12, x+1, 5, -12, P.server);
     for (let u = 0; u < 4; u++) vox(x, 2+u, -13, P.ledGreen, { emissive: P.ledGreen });
   }
-  // Floor cable trays
+  // Raised cable tray structure
   fillBox(-23, 2, -17, -16, 2, -17, P.concreteDark);
+  // Neon fiber cable runs on floor — cyan primary data path
+  for (let x = -23; x <= -15; x++) vox(x, 2, -16, P.neonCyan, { emissive: P.neonCyan });
+  // Pink/magenta secondary path (like image 2 centre glow)
+  for (let x = -22; x <= -16; x++) vox(x, 2, -14, 0xff44cc, { emissive: 0xff44cc });
+  // Cable arcs up the racks (vertical cables)
+  for (let y = 2; y <= 7; y++) vox(-17, y, -18, P.neonCyan, { emissive: P.neonCyan });
+  for (let y = 2; y <= 6; y++) vox(-20, y, -18, 0xff44cc,   { emissive: 0xff44cc });
+  // Bright overhead strip lights
+  for (let x = -22; x <= -15; x++) vox(x, 8, -15, P.neonCyan, { emissive: P.neonCyan });
+  // Central glowing hub (where cables converge — the pink core in image 2)
+  fillBox(-19, 3, -17, -18, 5, -16, 0xff22bb, { emissive: 0xff22bb });
   // Zone sign
   zoneLabel(-19, 8, -15, 'DATA CENTRE', P.neonBlue);
 }
@@ -395,11 +415,11 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.3;
+renderer.toneMappingExposure = 2.2;
 document.getElementById('renderer-container').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x0a0520, 40, 90);
+scene.fog = new THREE.Fog(0x2a1060, 60, 140);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
 
@@ -412,19 +432,23 @@ window.addEventListener('resize', resizeRenderer);
 resizeRenderer();
 
 // ─── Lights ───────────────────────────────────────────────────────────────────
-// Generous ambient so the interior is always legible
-const ambient = new THREE.AmbientLight(0x9080c0, 1.2);
+const ambient = new THREE.AmbientLight(0xd0c8ff, 5.5);
 scene.add(ambient);
 
-const sun = new THREE.DirectionalLight(0xfff0e8, 0.8);
-sun.position.set(10, 30, 10);
+const sun = new THREE.DirectionalLight(0xfff4e0, 3.5);
+sun.position.set(15, 40, 20);
 sun.castShadow = true;
 sun.shadow.mapSize.set(1024, 1024);
 sun.shadow.camera.near = 0.5;
-sun.shadow.camera.far = 100;
-sun.shadow.camera.left = sun.shadow.camera.bottom = -35;
-sun.shadow.camera.right = sun.shadow.camera.top = 35;
+sun.shadow.camera.far = 120;
+sun.shadow.camera.left = sun.shadow.camera.bottom = -40;
+sun.shadow.camera.right = sun.shadow.camera.top = 40;
 scene.add(sun);
+
+// Fill light from opposite direction so shadows aren't pitch black
+const fillLight = new THREE.DirectionalLight(0x80a0ff, 1.5);
+fillLight.position.set(-10, 20, -15);
+scene.add(fillLight);
 
 function ptLight(x, y, z, color, intensity, dist) {
   const l = new THREE.PointLight(color, intensity, dist);
@@ -432,22 +456,24 @@ function ptLight(x, y, z, color, intensity, dist) {
   scene.add(l);
   return l;
 }
-// Atrium lights
-ptLight(0, 7, 0, 0x8840ff, 4, 24);
-ptLight(0, 3, 0, 0x36C5F0, 3, 18);
-// Zone fills
-ptLight(-19, 5, -15, 0x00aaff, 3, 18);  // data centre
-ptLight(18, 5, 15, 0x00e5ff, 3, 16);    // cloud
-ptLight(18, 5, -7, 0xffaa00, 3, 14);    // payments
-ptLight(-16, 14, -15, 0xffcc00, 3, 18); // trading floor
-ptLight(16, 14, -15, 0x0099ff, 3, 18);  // ops centre
-ptLight(-16, 14, 15, 0xff2244, 3, 16);  // security
-ptLight(16, 14, 15, 0x00ff88, 3, 16);   // customer services
+// Atrium lights — very bright
+ptLight(0, 8, 0, 0xaa66ff, 20, 35);
+ptLight(0, 3, 0, 0x36C5F0, 14, 26);
+// Zone fills — cranked up
+ptLight(-19, 5, -15, 0x22aaff, 18, 28);  // data centre
+ptLight(18, 5, 15, 0x00e5ff, 16, 26);    // cloud
+ptLight(18, 5, -7, 0xffaa00, 16, 24);    // payments
+ptLight(-16, 14, -15, 0xffcc00, 18, 28); // trading floor
+ptLight(16, 14, -15, 0x22aaff, 18, 28);  // ops centre
+ptLight(-16, 14, 15, 0xff2244, 16, 26);  // security
+ptLight(16, 14, 15, 0x22ff88, 16, 26);   // customer services
 // Corridor fills
-ptLight(0, 4, -14, 0x6688ff, 2, 12);
-ptLight(0, 4, 14, 0x6688ff, 2, 12);
+ptLight(0, 4, -14, 0x7799ff, 10, 20);
+ptLight(0, 4,  14, 0x7799ff, 10, 20);
+ptLight(-12, 4, 0, 0xaa66ff, 8, 18);
+ptLight( 12, 4, 0, 0xaa66ff, 8, 18);
 
-const hemi = new THREE.HemisphereLight(0x2a1050, 0x0a0820, 0.6);
+const hemi = new THREE.HemisphereLight(0x8866ff, 0x4422aa, 3.0);
 scene.add(hemi);
 
 // ─── Instanced block renderer ─────────────────────────────────────────────────
@@ -458,9 +484,9 @@ function getMat(color, emissive) {
     matCache.set(k, new THREE.MeshStandardMaterial({
       color: new THREE.Color(color),
       emissive: emissive ? new THREE.Color(emissive) : new THREE.Color(0),
-      emissiveIntensity: emissive ? 0.85 : 0,
-      roughness: 0.8,
-      metalness: emissive ? 0.1 : 0,
+      emissiveIntensity: emissive ? 1.8 : 0,
+      roughness: 0.65,
+      metalness: emissive ? 0.2 : 0,
     }));
   }
   return matCache.get(k);
@@ -501,10 +527,10 @@ function buildSky() {
       varying vec3 vPos;
       void main(){
         float t=clamp((vPos.y+20.)/80.,0.,1.);
-        vec3 top=vec3(0.04,0.02,0.08);
-        vec3 mid=vec3(0.10,0.04,0.18);
-        vec3 hor=vec3(0.50,0.15,0.02);
-        vec3 col=mix(mix(hor,mid,smoothstep(0.,.18,t)),mix(mid,top,smoothstep(.18,1.,t)),step(.18,t));
+        vec3 top=vec3(0.05,0.12,0.38);
+        vec3 mid=vec3(0.12,0.28,0.60);
+        vec3 hor=vec3(0.70,0.30,0.10);
+        vec3 col=mix(mix(hor,mid,smoothstep(0.,.22,t)),mix(mid,top,smoothstep(.22,1.,t)),step(.22,t));
         gl_FragColor=vec4(col,1.);
       }`,
   });
@@ -737,28 +763,56 @@ function spawnNPCs() {
   makeIssueEnemy(-16, MEZ+4, -15,  'memLeak');   // trading floor — Memory Leak
 }
 
-// ─── Player character ─────────────────────────────────────────────────────────
+// ─── Player character (tech engineer — headphones, glowing vest) ──────────────
 const playerMesh = new THREE.Group();
 function b3(w,h,d,col,ox,oy,oz,em=0) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
-    new THREE.MeshStandardMaterial({ color:col, emissive: em ? new THREE.Color(em) : undefined, emissiveIntensity: em ? 0.6 : 0, roughness:0.7 }));
+    new THREE.MeshStandardMaterial({
+      color: col,
+      emissive: em ? new THREE.Color(em) : undefined,
+      emissiveIntensity: em ? 1.4 : 0,
+      roughness: 0.6,
+    }));
   m.position.set(ox,oy,oz);
   playerMesh.add(m);
   return m;
 }
-const plBody  = b3(0.7,0.85,0.5, P.jacketPurple, 0, 0.425, 0);
-const plHead  = b3(0.65,0.65,0.65, P.skin, 0, 1.1, 0);
-b3(0.65,0.25,0.67, P.hairDark, 0, 1.38, 0);          // hair
-b3(0.12,0.12,0.05, 0x111122, -0.15, 1.1, 0.33);      // eye L
-b3(0.12,0.12,0.05, 0x111122,  0.15, 1.1, 0.33);      // eye R
-const plLegL = b3(0.28,0.52,0.28, P.trousers, -0.2, -0.26, 0);
-const plLegR = b3(0.28,0.52,0.28, P.trousers,  0.2, -0.26, 0);
-b3(0.24,0.14,0.3, P.shoes, -0.2, -0.56, 0.04);
-b3(0.24,0.14,0.3, P.shoes,  0.2, -0.56, 0.04);
-const plArmL = b3(0.22,0.55,0.22, P.jacketPurple, -0.5, 0.38, 0);
-const plArmR = b3(0.22,0.55,0.22, P.jacketPurple,  0.5, 0.38, 0);
-b3(0.35,0.25,0.04, P.neonBlue, 0.62, 0.46, 0.12, P.neonBlue); // tablet
-b3(0.35,0.2,0.05, P.natwestRed, 0, 0.6, -0.27, P.natwestRed); // NatWest logo back
+// Body — purple/blue tech jacket
+b3(0.75,0.90,0.52, 0x3d1a6e, 0, 0.45, 0);
+// Jacket lapels
+b3(0.18,0.55,0.1, 0x2a1250, -0.2, 0.5, 0.27);
+b3(0.18,0.55,0.1, 0x2a1250,  0.2, 0.5, 0.27);
+// Chest panel (glowing tech display)
+b3(0.38,0.38,0.08, 0x0e1a40, 0, 0.56, 0.29);
+b3(0.26,0.26,0.08, P.neonCyan, 0, 0.58, 0.30, P.neonCyan);  // glowing circle
+// Chest buttons row
+b3(0.1,0.08,0.06, P.neonAmber, -0.12, 0.38, 0.29, P.neonAmber);
+b3(0.1,0.08,0.06, P.neonGreen,  0.0,  0.38, 0.29, P.neonGreen);
+b3(0.1,0.08,0.06, P.neonRed,    0.12, 0.38, 0.29, P.neonRed);
+// NatWest back logo
+b3(0.38,0.22,0.06, P.natwestRed, 0, 0.6, -0.28, P.natwestRed);
+// Head
+b3(0.68,0.68,0.68, P.skin, 0, 1.14, 0);
+// Hair (dark brown)
+b3(0.70,0.22,0.70, 0x3a1a08, 0, 1.47, 0);
+// Eyes
+b3(0.14,0.13,0.06, 0x111122, -0.16, 1.14, 0.35);
+b3(0.14,0.13,0.06, 0x111122,  0.16, 1.14, 0.35);
+// Headphone cups — cyan glow (matches image 3)
+b3(0.12,0.38,0.38, 0x1a55cc, -0.45, 1.16, 0, 0x2266ee);
+b3(0.12,0.38,0.38, 0x1a55cc,  0.45, 1.16, 0, 0x2266ee);
+// Headphone band over top
+b3(0.80,0.10,0.10, 0x223388, 0, 1.54, 0);
+// Legs
+const plLegL = b3(0.30,0.54,0.30, 0x1a1a38, -0.21, -0.27, 0);
+const plLegR = b3(0.30,0.54,0.30, 0x1a1a38,  0.21, -0.27, 0);
+b3(0.26,0.16,0.32, 0x111122, -0.21, -0.58, 0.05);
+b3(0.26,0.16,0.32, 0x111122,  0.21, -0.58, 0.05);
+// Arms — blue/purple
+const plArmL = b3(0.26,0.58,0.26, 0x2244aa, -0.53, 0.40, 0);
+const plArmR = b3(0.26,0.58,0.26, 0x2244aa,  0.53, 0.40, 0);
+// Tablet in right hand (glowing)
+b3(0.38,0.28,0.05, P.neonBlue, 0.68, 0.48, 0.14, P.neonBlue);
 scene.add(playerMesh);
 
 // ─── Player physics & camera ──────────────────────────────────────────────────
@@ -1086,6 +1140,9 @@ function collectEvidence(id, label) {
   addScore(50, 'Evidence collected');
 }
 
+const $recovFill = document.getElementById('recovery-fill');
+const $recovPct  = document.getElementById('recovery-pct');
+
 function updateHUD() {
   $timer.textContent = fmtT(timeLeft);
   $timer.style.color = timeLeft < 60 ? '#E01E5A' : '#ECB22E';
@@ -1095,6 +1152,10 @@ function updateHUD() {
   $hpct.textContent = hp + '%';
   $hpct.style.color = $fill.style.background;
   $incidents.innerHTML = `${incidentsDone} / ${TOTAL} <span style="font-size:11px;color:#E01E5A">RESOLVED</span>`;
+  // Recovery bar = incidents done / total
+  const recovPct = Math.round((incidentsDone / TOTAL) * 100);
+  $recovFill.style.width = recovPct + '%';
+  $recovPct.textContent  = `RECOVERY ${recovPct}%`;
 }
 
 // ─── Dialog ───────────────────────────────────────────────────────────────────

@@ -176,7 +176,7 @@
   <div class="hud-cell">
     <span class="hud-icon">⏱</span>
     <div class="hud-block">
-      <span class="hud-label">Time Remaining</span>
+      <span class="hud-label">RTO</span>
       <span id="timer-val">05:00</span>
     </div>
   </div>
@@ -198,6 +198,13 @@
     </div>
   </div>
 
+  <div class="hud-cell" id="threat-cell" style="display:flex; flex-direction:column; gap:2px;">
+    <span style="font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:#E01E5A;font-weight:bold;">⚠ THREAT ALERT</span>
+    <div id="recovery-bar-wrap" style="width:110px;height:10px;background:#1a1030;border:1px solid #E01E5A;border-radius:2px;overflow:hidden;">
+      <div id="recovery-fill" style="height:100%;width:0%;background:#36C5F0;transition:width 0.6s;"></div>
+    </div>
+    <span id="recovery-pct" style="font-size:10px;color:#36C5F0;letter-spacing:1px;">RECOVERY 0%</span>
+  </div>
   <div class="hud-cell" style="margin-left:auto; border-left: 1px solid rgba(63,14,64,0.7); border-right:none;">
     <button id="hint-btn">H — AI HINT</button>
   </div>
