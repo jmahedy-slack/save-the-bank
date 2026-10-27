@@ -1,0 +1,49 @@
+display_information:
+  name: SEV-1 Save the Bank
+  description: NatWest Engineering Arcade — real-time SEV-1 incident game channel for engineering teams.
+  background_color: "#3F0E40"
+  long_description: "SEV-1: Save the Bank drops engineers into a live incident simulation. This bot provisions the #save-the-bank channel, posts game session announcements, broadcasts leaderboard updates, and delivers post-incident summaries. Perfect for NatWest engineering events, onboarding days, and hackathons. Respond to the incident. Save the bank."
+
+features:
+  bot_user:
+    display_name: Save the Bank
+    always_online: true
+  slash_commands:
+    - command: /savethebank
+      description: Start a new Save the Bank game session or show the leaderboard
+      usage_hint: "[start | leaderboard | help]"
+      should_escape: false
+
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - chat:write.public
+      - chat:write.customize
+      - app_mentions:read
+      - channels:read
+      - channels:history
+      - channels:manage
+      - channels:join
+      - groups:read
+      - groups:write
+      - im:write
+      - reactions:write
+      - users:read
+      - users:read.email
+      - files:write
+
+settings:
+  interactivity:
+    is_enabled: true
+    request_url: https://savethebank.herokuapp.com/slack/events
+    message_menu_options_url: https://savethebank.herokuapp.com/slack/options
+  event_subscriptions:
+    request_url: https://savethebank.herokuapp.com/slack/events
+    bot_events:
+      - app_mention
+      - message.channels
+      - member_joined_channel
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
